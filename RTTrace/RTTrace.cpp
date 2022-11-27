@@ -16,6 +16,13 @@ using namespace Walnut;
 using namespace RTTrace;
 using abgr_t = uint32_t;
 
+std::vector<shared_ptr<Surface>> generate_default_surfaces() {
+	std::vector<shared_ptr<Surface>> surface_list;
+	surface_list.emplace_back(make_shared<Sphere>(Vec3(0.0,0.0,0.0), 1.2));
+	surface_list.emplace_back(make_shared<Plane>(Vec3(0.0,-2.0, 0.0), Vec3(0.0, 1.0, 0.0)));
+	return surface_list;
+}
+
 class RaytracerLayer : public Layer
 {
 public:
@@ -61,14 +68,14 @@ private:
 	{
 		float pixel_count = viewport_width * viewport_height;
 		delete[] data;
-		data = new abgr_t[pixel_count];
+		data = new abgr_t[(size_t)pixel_count];
 		m_Image = std::make_shared<Image>(viewport_width, viewport_height, ImageFormat::RGBA);
 
 		Timer timer;
 
 		camera.perspective(45, Vec3(0,0,0), viewport_width, viewport_height);
-		for (float y = 0; y < viewport_height; y += 1.0) {
-			for (float x = 0; x < viewport_width; x += 1.0) {
+		for (int y = 0; y < viewport_height; y++) {
+			for (int x = 0; x < viewport_width; x++) {
 				Ray r = camera.gen_ray(x, y);
 				int index = (int)y * viewport_width + (int)x;
 				HitInfo hit{};
@@ -80,7 +87,7 @@ private:
 					}
 				}
 				data[index] = hit.t > 0 ? Vec3ToARGB(glm::normalize(r.dir)) : 0x0;
-				/* */
+				/**/
 			}
 		}
 

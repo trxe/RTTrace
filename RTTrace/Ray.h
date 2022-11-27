@@ -22,10 +22,5 @@ namespace RTTrace {
 
 		friend std::ostream& operator<<(std::ostream& os, const Ray& ray);
 	};
-
-	std::ostream& operator<<(std::ostream& os, const Ray& ray) {
-		os << "origin: {" << ray.origin << "}, dir: {" << ray.dir << "}";
-		return os;
-	}
 }
 
