@@ -4,16 +4,16 @@
 
 #include "glm/glm.hpp"
 
-#include "Ray.h"
+#include "Ray.cuh"
 #include "Surface.h"
 
 namespace RTTrace {
 	bool Sphere::hit(const Ray& ray, HitInfo& info) const {
-		auto rd = glm::normalize(ray.dir);
+		auto rd = norm(ray.dir);
 		auto ro = origin - ray.origin;
 		auto a = 1;
-		auto b = 2 * glm::dot(rd, ro);
-		auto c = glm::dot(ro, ro) - radius*radius;
+		auto b = 2 * dot(rd, ro);
+		auto c = dot(ro, ro) - radius*radius;
 
 		auto discSquared = b * b - 4 * a * c;
 		if (discSquared < 0) return false;
@@ -23,7 +23,7 @@ namespace RTTrace {
 		float t = t_small < T_EPSILON ? t_big : t_small;
 		info.t = t;
 		info.pos = ray.point(t);
-		info.norm = glm::normalize(info.pos - origin);
+		info.norm = norm(info.pos - origin);
 		return true;
 	}
 }

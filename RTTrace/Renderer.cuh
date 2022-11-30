@@ -1,9 +1,28 @@
-#include <cuda_runtime.h>
+#include <memory>
+#include <vector>
 
-#ifdef __CUDACC__
-#define CUDA_CALLABLE __host__ __device__
-#else
-#define CUDA_CALLABLE
-#endif
+#include "Camera.cuh"
+#include "Surface.h"
 
-void cudaCallAddVectorKernel();
+#ifndef RENDERER_H
+#define RENDERER_H
+
+using abgr_t = uint32_t;
+
+namespace RTTrace {
+	class Renderer {
+	public:
+		Renderer() = delete;
+		Renderer(Camera& camera, std::vector<shared_ptr<Surface>> surfaces)
+			: camera(camera), surfaces(surfaces){};
+
+		abgr_t* const render(float viewport_width, float viewport_height);
+
+	private:
+		Camera camera;
+		std::vector<shared_ptr<Surface>> surfaces;
+		abgr_t* data;
+	};
+
+}
+#endif 

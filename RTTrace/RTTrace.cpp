@@ -8,9 +8,10 @@
 #include "Walnut/Random.h"
 #include "Walnut/Timer.h"
 
-#include "Camera.h"
+#include "Camera.cuh"
 #include "Surface.h"
 #include "Util.h"
+#include "Renderer.cuh"
 
 using namespace Walnut;
 using namespace RTTrace;
@@ -58,39 +59,18 @@ private:
 	Camera camera{ Vec3{0,0,6} };
 	std::vector<shared_ptr<Surface>> surfaces = generate_default_surfaces();
 	std::shared_ptr<Image> m_Image;
-	abgr_t* data;
 	float viewport_width{};
 	float viewport_height{};
+	Renderer renderer{ camera, surfaces };
 
 	float last_render_time = -1;
 
 	void Render()
 	{
-		float pixel_count = viewport_width * viewport_height;
-		delete[] data;
-		data = new abgr_t[(size_t)pixel_count];
 		m_Image = std::make_shared<Image>(viewport_width, viewport_height, ImageFormat::RGBA);
 
 		Timer timer;
-
-		camera.perspective(45, Vec3(0,0,0), viewport_width, viewport_height);
-		for (int y = 0; y < viewport_height; y++) {
-			for (int x = 0; x < viewport_width; x++) {
-				Ray r = camera.gen_ray(x, y);
-				int index = (int)y * viewport_width + (int)x;
-				HitInfo hit{};
-				for (auto &surface : surfaces) {
-					HitInfo this_hit;
-					bool is_hit = surface->hit(r, this_hit);
-					if (is_hit) {
-						hit = (hit.t < 0 || this_hit.t < hit.t) ? this_hit : hit;
-					}
-				}
-				data[index] = hit.t > 0 ? Vec3ToARGB(glm::normalize(r.dir)) : 0x0;
-				/**/
-			}
-		}
-
+		abgr_t* data = renderer.render(viewport_width, viewport_height);
 		last_render_time = timer.ElapsedMillis();
 
 		m_Image->SetData(data);

@@ -5,11 +5,10 @@
 
 #include "glm/glm.hpp"
 
-#include "Ray.h"
+#include "Ray.cuh"
 
 using std::shared_ptr;
 using std::make_shared;
-using Vec3 = glm::vec3;
 using Vec4 = glm::vec4;
 
 namespace RTTrace {
@@ -31,7 +30,7 @@ namespace RTTrace {
 	class Plane : public Surface {
 	public:
 		Plane() = delete;
-		Plane(const Vec3& origin, const Vec3& normal) : normal{ normal }, n_dot_point{ -glm::dot(normal,origin) } {
+		Plane(const Vec3& origin, const Vec3& normal) : normal{ normal }, n_dot_point{ -dot(normal,origin) } {
 			Surface::origin = origin;
 		}
 		virtual bool hit(const Ray& ray, HitInfo& info) const override;

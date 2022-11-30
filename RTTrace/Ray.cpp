@@ -1,8 +1,7 @@
 
 #include <iostream>
 
-#include <glm/glm.hpp>
-#include "Ray.h"
+#include "Ray.cuh"
 
 namespace RTTrace {
 	std::ostream& operator<<(std::ostream& os, const Ray& ray) {
