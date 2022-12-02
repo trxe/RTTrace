@@ -12,26 +12,37 @@
 
 namespace RTTrace {
 
-	__global__ void gpu_render(const CameraInfo* info, int width, int height, abgr_t* data) {
+	// __global__ void gpu_render(const CameraInfo* info, int width, int height, abgr_t* data) {
+	__global__ void gpu_render(const CameraInfo* info, int width, int height, abgr_t* data, const SurfaceInfo* surfaces, int surface_count) {
 		int x = blockIdx.x * blockDim.x + threadIdx.x;
 		int y = blockIdx.y * blockDim.y + threadIdx.y;
 		int pos = y * width + x;
 		if (x >= width || y >= height) return;
 		Camera c(*info, width, height);
 		Ray ray = c.gen_ray(x, y);
-		data[pos] = vec3_to_abgr(ray.origin + ray.dir);
+		HitInfo hit;
+
+		for (int i = 0; i < surface_count; i++) {
+			switch (surfaces[i].type) {
+			case SurfaceInfo::PLANE:
+				hit_plane(ray, surfaces[i], hit);
+				break;
+			case SurfaceInfo::SPHERE:
+				hit_sphere(ray, surfaces[i], hit);
+				break;
+			}
+		}
+		data[pos] = hit.is_hit ? vec3_to_abgr(ray.origin + ray.dir) : 0x0;
 	}
 
-	/*
-	void Renderer::set_world(Surface** surfaces, int count) {
+	void Renderer::set_world(SurfaceInfo* surfaces, int count) {
 		surface_count = count;
-		checkCudaErrors(cudaFree(&surfaces_d));
-		checkCudaErrors(cudaMalloc(&surfaces_d, sizeof(Surface) * count));
-		for (int i = 0; i < count; i++) {
-			checkCudaErrors(cudaMemcpy(&surfaces_d[i], &surfaces[i], sizeof(Surface), cudaMemcpyHostToDevice));
+		if (surfaces_d != nullptr) {
+			checkCudaErrors(cudaFree(&surfaces_d));
 		}
+		checkCudaErrors(cudaMalloc(&surfaces_d, sizeof(SurfaceInfo) * count));
+		checkCudaErrors(cudaMemcpy(surfaces_d, surfaces, sizeof(SurfaceInfo) * count, cudaMemcpyHostToDevice));
 	}
-	*/
 
 	void BasicRaytracer::render(float viewport_width, float viewport_height, const CameraInfo& info, abgr_t* data) {
 		size_t pixel_count = static_cast<size_t>(viewport_width * viewport_height);
@@ -51,7 +62,8 @@ namespace RTTrace {
 		checkCudaErrors(cudaMemcpy(info_device, &info, sizeof(CameraInfo), cudaMemcpyHostToDevice));
 
 		checkCudaErrors(cudaDeviceSynchronize());
-		gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d);
+		// gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d);
+		gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, surfaces_d, surface_count);
 		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaMemcpy(data, data_d, pixel_count * sizeof(abgr_t), cudaMemcpyDeviceToHost));
 	}

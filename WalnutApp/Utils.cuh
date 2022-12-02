@@ -13,7 +13,7 @@ namespace RTTrace {
 	 * Camera settings set from Main.cpp and sent via the Renderer to device.
 	 */
 	struct CameraInfo {
-		float eye[3] = { 0, 0, 1 };
+		float eye[3] = { 0, 0, 6 };
 		float at[3] = { 0, 0, 0 };
 		float up[3] = { 0, 1, 0 };
 		float fovy = 45; // in degrees

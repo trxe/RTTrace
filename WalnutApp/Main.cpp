@@ -66,8 +66,8 @@ private:
 
 	float last_render_time = -1;
 	abgr_t* data = nullptr;
-	// Surface** surfaces;
-	// int surface_count;
+	SurfaceInfo* surface_infos = nullptr;
+	int surface_count;
 	BasicRaytracer tracer;
 
 	void Render()
@@ -75,17 +75,24 @@ private:
 		m_Image = std::make_shared<Image>(viewport_width, viewport_height, ImageFormat::RGBA);
 		size_t pixel_count = static_cast<size_t>(viewport_width * viewport_height);
 
-		/*
-		if (surfaces == nullptr) {
-			std::vector<Surface*> surf_vec;
-			surf_vec.push_back(new Sphere(Vec3(0, 0, 0), 1));
-			surfaces = surf_vec.data();
-			surface_count = surf_vec.size();
+		if (surface_infos == nullptr) {
+			surface_infos = new SurfaceInfo[2];
+			SurfaceInfo& s0 = surface_infos[0];
+			s0.type = SurfaceInfo::SPHERE;
+			s0.origin = Vec3(0.0, 1.0, -1.0);
+			s0.scale = 1.4;
+			/*
+			SurfaceInfo& s1 = surface_infos[1];
+			s1.type = SurfaceInfo::PLANE;
+			s1.origin = Vec3(0.0, -1.0, -1.0);
+			s1.normal = Vec3(0.0, 1.0, 0.0);
+			*/
+			surface_count = 1;
+			tracer.set_world(surface_infos, surface_count);
 		}
-		*/
 
 		Timer timer;
-		// abgr_t* data = renderer.render(viewport_width, viewport_height);
+
 		delete[] data;
 
 		data = new abgr_t[pixel_count];

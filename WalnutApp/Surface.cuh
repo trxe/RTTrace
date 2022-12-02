@@ -11,43 +11,27 @@
 namespace RTTrace {
 
 #define T_MAX 1000000
-#define T_EPSILON 0.000001
+#define T_EPSILON 0.01
 
 	struct HitInfo {
-		float t;
+		bool is_hit = false;
+		float t = -1;
 		Vec3 pos;
 		Vec3 norm;
 		// the caller of hit(r, hit) is responsible for adding the surface's index here.
-		int surface_index;
+		int surface_index = -1;
 	};
 
-	/*
-	class Surface {
-	public:
-		__device__ virtual bool hit(const Ray& r, HitInfo* hit) const = 0;
-	};
-
-	class Sphere : public Surface {
-	public:
-		Sphere(Vec3 origin, float radius) : origin(origin), radius(radius) {};
-		__device__ virtual bool hit(const Ray& ray, HitInfo* hit) const override;
-	private:
-		Vec3 origin;
-		float radius;
-	};
-
-	class Plane : public Surface {
-	public:
-		Plane(Vec3 normal, Vec3 origin) : origin(origin), normal(normal) {
-			n_dot_point = dot(origin, normal);
-		};
-		__device__ virtual bool hit(const Ray& ray, HitInfo* hit) const override;
-	private:
+	struct SurfaceInfo {
+		enum Type { SPHERE, PLANE };
+		Type type;
 		Vec3 origin;
 		Vec3 normal;
-		float n_dot_point;
+		float scale;
 	};
-	*/
+
+	__device__ bool hit_sphere(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);
+	__device__ bool hit_plane(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);
 
 }
 
