@@ -8,7 +8,7 @@
 
 using namespace Walnut;
 
-void InputHandler::OnUpdate(float ts) {
+bool InputHandler::OnUpdate(float ts) {
 	glm::vec2 mousePos = Input::GetMousePosition();
 	glm::vec2 delta = (mousePos - m_LastMousePosition) * 0.002f;
 	m_LastMousePosition = mousePos;
@@ -17,13 +17,13 @@ void InputHandler::OnUpdate(float ts) {
 	if (Input::IsKeyDown(KeyCode::R))
 	{
 		camInfo = {};
-		return;
+		return true;
 	}
 
 	if (!Input::IsMouseButtonDown(MouseButton::Right))
 	{
 		Input::SetCursorMode(CursorMode::Normal);
-		return;
+		return false;
 	}
 
 	Input::SetCursorMode(CursorMode::Locked);
@@ -97,6 +97,8 @@ void InputHandler::OnUpdate(float ts) {
 		camInfo.up[2] = m_UpDirection.z;
 
 		// RecalculateView();
+		return true;
 	}
 
+	return false;
 }

@@ -10,6 +10,7 @@
 #include "Utils.cuh"
 
 using namespace Walnut;
+using namespace RTTrace;
 
 class RaytracerLayer : public Layer
 {
@@ -52,7 +53,9 @@ public:
 	}
 
 	virtual void OnUpdate(float ts) override {
-		input.OnUpdate(ts);
+		if (input.OnUpdate(ts)) {
+			Render();
+		}
 	}
 
 private:
@@ -63,12 +66,23 @@ private:
 
 	float last_render_time = -1;
 	abgr_t* data = nullptr;
-	RTTrace::BasicRaytracer tracer;
+	// Surface** surfaces;
+	// int surface_count;
+	BasicRaytracer tracer;
 
 	void Render()
 	{
 		m_Image = std::make_shared<Image>(viewport_width, viewport_height, ImageFormat::RGBA);
 		size_t pixel_count = static_cast<size_t>(viewport_width * viewport_height);
+
+		/*
+		if (surfaces == nullptr) {
+			std::vector<Surface*> surf_vec;
+			surf_vec.push_back(new Sphere(Vec3(0, 0, 0), 1));
+			surfaces = surf_vec.data();
+			surface_count = surf_vec.size();
+		}
+		*/
 
 		Timer timer;
 		// abgr_t* data = renderer.render(viewport_width, viewport_height);
@@ -76,11 +90,14 @@ private:
 
 		data = new abgr_t[pixel_count];
 
+		tracer.render(viewport_height, viewport_width, input.get_cam_info(), data);
+
 		// PLACEHOLDER RED
+		/*
 		for (size_t i{}; i < pixel_count; i++) {
 			data[i] = 0xff0000ff;
 		}
-		tracer.render(viewport_height, viewport_width, input.get_cam_info(), data);
+		*/
 
 		last_render_time = timer.ElapsedMillis();
 

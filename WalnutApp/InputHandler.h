@@ -8,7 +8,7 @@
  */
 class InputHandler {
 public:
-	void OnUpdate(float ts);
+	bool OnUpdate(float ts);
 	float get_rotation_speed() { return 0.3f; }
 
 	const RTTrace::CameraInfo get_cam_info() { return camInfo; }
