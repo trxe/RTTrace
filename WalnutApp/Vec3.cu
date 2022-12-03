@@ -11,6 +11,10 @@ namespace RTTrace {
 		return u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
 	}
 
+	__host__ __device__ Vec3 reflect(const Vec3& l, const Vec3& n) {
+		return n * dot(n, l) * 2.0f - l;
+	}
+
 	__host__ __device__ Vec3 norm(const Vec3& u) {
 		return u / u.len();
 	}
@@ -23,13 +27,14 @@ namespace RTTrace {
 
 	__host__ __device__ abgr_t vec3_to_abgr(const Vec3 &u) {
 		abgr_t result;
-		float len = u.len();
-		Vec3 unorm = (len > 1.0) ? u / len : u;
-		int r = (int)(fabs(unorm[0]) * 255.0);
-		int g = (int)(fabs(unorm[1]) * 255.0);
-		int b = (int)(fabs(unorm[2]) * 255.0);
-		abgr_t gb = g << 8;
-		abgr_t bb = b << 16;
+		Vec3 unorm = u;
+		for (int i = 0; i < 3; i++) {
+			unorm[i] = fminf(1.0, unorm[i]);
+			unorm[i] = fmaxf(0.0, unorm[i]);
+		}
+		int r = (int)(unorm[0] * 255.0);
+		int g = (int)(unorm[1] * 255.0);
+		int b = (int)(unorm[2] * 255.0);
 		result = 0xff000000 | (abgr_t)b << 16 | (abgr_t)g << 8 | (abgr_t)r;
 		return result;
 	}

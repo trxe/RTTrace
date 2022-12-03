@@ -18,6 +18,7 @@ namespace RTTrace {
 		float t = T_MAX+1;
 		Vec3 pos;
 		Vec3 norm;
+		Vec3 view_dir;
 		// the caller of hit(r, hit) is responsible for adding the surface's index here.
 		int surface_index = -1;
 	};
@@ -28,9 +29,9 @@ namespace RTTrace {
 		Vec3 ks;
 		Vec3 krg;
 		Vec3 ktg;
-		float n;
-		float m;
-		float mu; // refractive index
+		float n = 8;
+		float m = 1;
+		float mu = 1; // refractive index
 	};
 
 	struct SurfaceInfo {

@@ -20,6 +20,7 @@ namespace RTTrace {
 		float t = t_small < T_EPSILON ? t_big : t_small;
 		hit.is_hit = true;
 		hit.t = t;
+		hit.view_dir = rd;
 		hit.pos = ray.point(t);
 		hit.norm = norm(hit.pos - origin);
 		return true;
@@ -33,6 +34,7 @@ namespace RTTrace {
 		if (t < T_EPSILON || t > T_MAX) return false;
 		hit.is_hit = true;
 		hit.t = t;
+		hit.view_dir = d;
 		hit.pos = ray.point(t);
 		hit.norm = normal;
 		return true;	
