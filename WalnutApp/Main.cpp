@@ -87,16 +87,18 @@ private:
 			s0.origin = Vec3(1.0, 1.0, -1.0);
 			s0.scale = 1.4;
 			s0.mat.ka = Vec3(0.2, 0.0, 0.0);
-			s0.mat.kd = Vec3(0.0, 0.7, 0.0);
+			s0.mat.kd = Vec3(1.0, 0.7, 0.0);
 			s0.mat.ks = Vec3(1.0, 1.0, 1.0);
 			surface_count = 1;
 			SurfaceInfo& s1 = surface_infos[1];
 			s1.type = SurfaceInfo::PLANE;
 			s1.origin = Vec3(0.0, -1.0, -1.0);
 			s1.normal = Vec3(0.0, 1.0, 0.0);
+			s1.mat.ka = Vec3(0.0, 0.0, 0.01);
+			s1.mat.kd = Vec3(0.0, 0.2, 0.5);
+			s1.mat.ks = Vec3(1.0, 1.0, 1.0);
 			surface_count = 2;
-			/*
-			*/
+			/* */
 			tracer.set_world(surface_infos, surface_count);
 		}
 

@@ -23,13 +23,14 @@ namespace RTTrace {
 
 	__host__ __device__ abgr_t vec3_to_abgr(const Vec3 &u) {
 		abgr_t result;
-		Vec3 unorm = norm(u);
+		float len = u.len();
+		Vec3 unorm = (len > 1.0) ? u / len : u;
 		int r = (int)(fabs(unorm[0]) * 255.0);
 		int g = (int)(fabs(unorm[1]) * 255.0);
 		int b = (int)(fabs(unorm[2]) * 255.0);
 		abgr_t gb = g << 8;
 		abgr_t bb = b << 16;
-		result = 0xff000000 | bb | gb | r;
+		result = 0xff000000 | (abgr_t)b << 16 | (abgr_t)g << 8 | (abgr_t)r;
 		return result;
 	}
 

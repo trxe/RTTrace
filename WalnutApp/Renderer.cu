@@ -71,6 +71,7 @@ namespace RTTrace {
 		}
 		// data[pos] = hit_global.is_hit ? vec3_to_abgr(norm(hit_global.norm)) : 0x0;
 		data[pos] = hit_global.is_hit ? get_light(hit_global, lights, light_count, surfaces, surface_count) : 0x0;
+		// data[pos] = hit_global.is_hit ? 0xff5f0000 : 0x0;
 	}
 
 	void Renderer::set_world(SurfaceInfo* surfaces, int count) {
@@ -109,8 +110,6 @@ namespace RTTrace {
 		checkCudaErrors(cudaMemcpy(info_device, &info, sizeof(CameraInfo), cudaMemcpyHostToDevice));
 
 		checkCudaErrors(cudaDeviceSynchronize());
-		// gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d);
-		// gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, surfaces_d, surface_count);
 		gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, surfaces_d, surface_count, lights_d, light_count);
 		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaMemcpy(data, data_d, pixel_count * sizeof(abgr_t), cudaMemcpyDeviceToHost));
