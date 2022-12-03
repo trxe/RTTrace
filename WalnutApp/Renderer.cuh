@@ -1,8 +1,9 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "Utils.cuh"
+#include "Light.cuh"
 #include "Surface.cuh"
+#include "Utils.cuh"
 
 namespace RTTrace {
 	/**
@@ -20,10 +21,13 @@ namespace RTTrace {
 		 * \return 
 		 */
 		virtual void set_world(SurfaceInfo* surfaces, int count);
+		virtual void set_lights(LightInfo* lights, int count);
 		virtual void render(float viewport_width, float viewport_height, const CameraInfo& info, abgr_t* data) = 0;
 	protected:
 		SurfaceInfo* surfaces_d;
 		int surface_count;
+		LightInfo* lights_d;
+		int light_count;
 		abgr_t* data_d;
 	};
 

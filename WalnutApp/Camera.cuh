@@ -34,7 +34,7 @@ namespace RTTrace {
 			pixel_width = image_width / (float)res_x;
 			pixel_height = image_height / (float)res_y;
 
-			image_origin_cam = Vec3(-image_width * 0.5f, -image_height * 0.5f, focal_dist);
+			image_origin_cam = Vec3(-image_width * 0.5f, -image_height * 0.5f, -focal_dist);
 		}
 
 		__device__ void testDevice() {

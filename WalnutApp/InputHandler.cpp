@@ -33,7 +33,7 @@ bool InputHandler::OnUpdate(float ts) {
 	glm::vec3 m_Position = get_position();
 	glm::vec3 m_UpDirection = get_up_dir();
 	glm::vec3 m_ForwardDirection = get_forward_dir();
-	glm::vec3 rightDirection = glm::cross(m_ForwardDirection, m_UpDirection);
+	glm::vec3 rightDirection = glm::cross(m_UpDirection, m_ForwardDirection);
 
 	float speed = 5.0f;
 
@@ -60,12 +60,12 @@ bool InputHandler::OnUpdate(float ts) {
 	}
 	if (Input::IsKeyDown(KeyCode::Q))
 	{
-		m_Position -= m_UpDirection * speed * ts;
+		m_Position += m_UpDirection * speed * ts;
 		moved = true;
 	}
 	else if (Input::IsKeyDown(KeyCode::E))
 	{
-		m_Position += m_UpDirection * speed * ts;
+		m_Position -= m_UpDirection * speed * ts;
 		moved = true;
 	}
 
@@ -75,7 +75,7 @@ bool InputHandler::OnUpdate(float ts) {
 		float pitchDelta = delta.y * get_rotation_speed();
 		float yawDelta = delta.x * get_rotation_speed();
 
-		glm::quat q = glm::normalize(glm::cross(glm::angleAxis(-pitchDelta, rightDirection),
+		glm::quat q = glm::normalize(glm::cross(glm::angleAxis(pitchDelta, rightDirection),
 			glm::angleAxis(-yawDelta, glm::vec3(0.f, 1.0f, 0.0f))));
 		m_ForwardDirection = glm::rotate(q, m_ForwardDirection);
 		m_UpDirection = glm::rotate(q, m_UpDirection);

@@ -15,11 +15,22 @@ namespace RTTrace {
 
 	struct HitInfo {
 		bool is_hit = false;
-		float t = -1;
+		float t = T_MAX+1;
 		Vec3 pos;
 		Vec3 norm;
 		// the caller of hit(r, hit) is responsible for adding the surface's index here.
 		int surface_index = -1;
+	};
+
+	struct MaterialInfo {
+		Vec3 ka;
+		Vec3 kd;
+		Vec3 ks;
+		Vec3 krg;
+		Vec3 ktg;
+		float n;
+		float m;
+		float mu; // refractive index
 	};
 
 	struct SurfaceInfo {
@@ -28,6 +39,7 @@ namespace RTTrace {
 		Vec3 origin;
 		Vec3 normal;
 		float scale;
+		MaterialInfo mat;
 	};
 
 	__device__ bool hit_sphere(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);

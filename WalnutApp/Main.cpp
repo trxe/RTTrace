@@ -6,7 +6,10 @@
 #include "Walnut/Timer.h"
 
 #include "InputHandler.h"
+
+#include "Light.cuh"
 #include "Renderer.cuh"
+#include "Surface.cuh"
 #include "Utils.cuh"
 
 using namespace Walnut;
@@ -67,7 +70,9 @@ private:
 	float last_render_time = -1;
 	abgr_t* data = nullptr;
 	SurfaceInfo* surface_infos = nullptr;
+	LightInfo* light_infos = nullptr;
 	int surface_count;
+	int light_count;
 	BasicRaytracer tracer;
 
 	void Render()
@@ -79,16 +84,31 @@ private:
 			surface_infos = new SurfaceInfo[2];
 			SurfaceInfo& s0 = surface_infos[0];
 			s0.type = SurfaceInfo::SPHERE;
-			s0.origin = Vec3(0.0, 1.0, -1.0);
+			s0.origin = Vec3(1.0, 1.0, -1.0);
 			s0.scale = 1.4;
-			/*
+			s0.mat.ka = Vec3(0.2, 0.0, 0.0);
+			s0.mat.kd = Vec3(0.0, 0.7, 0.0);
+			s0.mat.ks = Vec3(1.0, 1.0, 1.0);
+			surface_count = 1;
 			SurfaceInfo& s1 = surface_infos[1];
 			s1.type = SurfaceInfo::PLANE;
 			s1.origin = Vec3(0.0, -1.0, -1.0);
 			s1.normal = Vec3(0.0, 1.0, 0.0);
+			surface_count = 2;
+			/*
 			*/
-			surface_count = 1;
 			tracer.set_world(surface_infos, surface_count);
+		}
+
+		if (light_infos == nullptr) {
+			light_infos = new LightInfo[1];
+			LightInfo& l0 = light_infos[0];
+			l0.type = LightInfo::POINT;
+			l0.origin = Vec3(0.0, 5.0, 0.0);
+			l0.color = Vec3(1.0, 1.0, 1.0);
+			l0.intensity = 1.0f;
+			light_count = 1;
+			tracer.set_lights(light_infos, light_count);
 		}
 
 		Timer timer;
@@ -97,7 +117,7 @@ private:
 
 		data = new abgr_t[pixel_count];
 
-		tracer.render(viewport_height, viewport_width, input.get_cam_info(), data);
+		tracer.render(viewport_width, viewport_height, input.get_cam_info(), data);
 
 		// PLACEHOLDER RED
 		/*

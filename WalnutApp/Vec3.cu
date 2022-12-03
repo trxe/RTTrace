@@ -3,6 +3,10 @@
 #include "Utils.cuh"
 
 namespace RTTrace {
+	__host__ __device__ Vec3 operator-(const Vec3& u) {
+		return Vec3(-u[0], -u[1], -u[2]);
+	}
+
 	__host__ __device__ float dot(const Vec3& u, const Vec3& v) {
 		return u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
 	}
@@ -20,10 +24,12 @@ namespace RTTrace {
 	__host__ __device__ abgr_t vec3_to_abgr(const Vec3 &u) {
 		abgr_t result;
 		Vec3 unorm = norm(u);
-		int r = (int)(fabs(unorm[0]) * 256.0);
-		int g = (int)(fabs(unorm[1]) * 256.0);
-		int b = (int)(fabs(unorm[2]) * 256.0);
-		result = 0xff000000 | b << 16 | g << 8 | r;
+		int r = (int)(fabs(unorm[0]) * 255.0);
+		int g = (int)(fabs(unorm[1]) * 255.0);
+		int b = (int)(fabs(unorm[2]) * 255.0);
+		abgr_t gb = g << 8;
+		abgr_t bb = b << 16;
+		result = 0xff000000 | bb | gb | r;
 		return result;
 	}
 

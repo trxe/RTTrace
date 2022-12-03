@@ -29,6 +29,10 @@ namespace RTTrace {
 			return a[c];
 		}
 
+		__host__ __device__ Vec3 operator-() {
+			return Vec3(-a[0], -a[1], -a[2]);
+		}
+
 		__host__ __device__ Vec3& operator+=(const Vec3& b) {
 			for (int i = 0; i < 3; i++) a[i] += b[i];
 			return *this;
@@ -59,10 +63,15 @@ namespace RTTrace {
 			return Vec3(a[0] * k, a[1] * k, a[2] * k);
 		}
 
+		__host__ __device__ Vec3 operator*(const Vec3& v) const {
+			return Vec3(a[0] * v[0], a[1] * v[1], a[2] * v[2]);
+		}
+
 	private:
 		float a[3];
 	};
 
+	__host__ __device__ Vec3 operator-(const Vec3& u);
 	__host__ __device__ float dot(const Vec3& u, const Vec3& v);
 	__host__ __device__ Vec3 cross(const Vec3& u, const Vec3& v);
 	__host__ __device__ Vec3 norm(const Vec3& u);
