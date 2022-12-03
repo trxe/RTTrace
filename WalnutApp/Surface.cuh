@@ -19,6 +19,7 @@ namespace RTTrace {
 		Vec3 pos;
 		Vec3 norm;
 		Vec3 view_dir;
+		Vec3 refl_dir;
 		// the caller of hit(r, hit) is responsible for adding the surface's index here.
 		int surface_index = -1;
 	};

@@ -12,7 +12,7 @@
 
 namespace RTTrace {
 
-	__device__ abgr_t get_light(const HitInfo& hit, const LightInfo* lights, int light_count, const SurfaceInfo* surfaces, int surface_count) {
+	__device__ abgr_t get_light(HitInfo& hit, const LightInfo* lights, int light_count, const SurfaceInfo* surfaces, int surface_count) {
 		if (hit.surface_index < 0) return 0x0;
 		const SurfaceInfo& surface = surfaces[hit.surface_index];
 		Vec3 color;
@@ -37,7 +37,8 @@ namespace RTTrace {
 				float n_dot_l = dot(hit.norm, shadow_ray.dir);
 				if (n_dot_l <= 0.0) continue;
 				color += l.color * surface.mat.kd * l.intensity * n_dot_l;
-				Vec3 r = reflect(shadow_ray.dir, hit.norm);
+				Vec3 r = reflect(-shadow_ray.dir, hit.norm);
+				hit.refl_dir = r;
 				float r_dot_v = fmaxf(0, dot(norm(r), norm(hit.view_dir)));
 				float r_dot_v_pow_n = powf(r_dot_v, surface.mat.n);
 				Vec3 specular = l.color * surface.mat.ks * l.intensity * r_dot_v_pow_n;
