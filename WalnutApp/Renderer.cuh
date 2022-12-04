@@ -22,7 +22,7 @@ namespace RTTrace {
 		 */
 		virtual void set_world(SurfaceInfo* surfaces, int count);
 		virtual void set_lights(LightInfo* lights, int count);
-		virtual void render(float viewport_width, float viewport_height, const CameraInfo& info, abgr_t* data) = 0;
+		virtual void render(float viewport_width, float viewport_height, int recursion_levels, const CameraInfo& info, abgr_t* data) = 0;
 	protected:
 		SurfaceInfo* surfaces_d;
 		int surface_count;
@@ -33,7 +33,7 @@ namespace RTTrace {
 
 	class BasicRaytracer : public Renderer {
 	public:
-		virtual void render(float viewport_width, float viewport_height, const CameraInfo& info, abgr_t* data) override;
+		virtual void render(float viewport_width, float viewport_height, int recursion_levels, const CameraInfo& info, abgr_t* data) override;
 	private:
 		float last_res[2];
 	};

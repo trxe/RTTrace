@@ -12,12 +12,13 @@
 
 namespace RTTrace {
 
-	__device__ abgr_t get_light(HitInfo& hit, const LightInfo* lights, int light_count, const SurfaceInfo* surfaces, int surface_count) {
+	__device__ Vec3 get_light(HitInfo& hit, const LightInfo* lights, int light_count, const SurfaceInfo* surfaces, int surface_count) {
 		if (hit.surface_index < 0) return 0x0;
 		const SurfaceInfo& surface = surfaces[hit.surface_index];
 		Vec3 color;
 		for (int i = 0; i < light_count; i++) {
 			const LightInfo& l = lights[i];
+			// Ray shadow_ray{hit.pos, l.origin - hit.pos};
 			Ray shadow_ray{hit.pos, l.origin - hit.pos};
 			HitInfo shadow_hit;
 			for (int s = 0; s < surface_count; s++) {
@@ -46,12 +47,11 @@ namespace RTTrace {
 			}
 		}
 		color += surface.mat.ka;
-		abgr_t result = vec3_to_abgr(color);
-		return result;
+		return color;
 	}
 
 	// __global__ void gpu_render(const CameraInfo* info, int width, int height, abgr_t* data, const SurfaceInfo* surfaces, int surface_count) {
-	__global__ void gpu_render(const CameraInfo* info, int width, int height, abgr_t* data, const SurfaceInfo* surfaces, int surface_count, const LightInfo* lights, int light_count) {
+	__global__ void gpu_render(const CameraInfo* info, int width, int height, abgr_t* data, const SurfaceInfo* surfaces, int surface_count, const LightInfo* lights, int light_count, int recursion_levels) {
 		int x = blockIdx.x * blockDim.x + threadIdx.x;
 		int y = blockIdx.y * blockDim.y + threadIdx.y;
 		// need to invert position
@@ -59,26 +59,36 @@ namespace RTTrace {
 		if (x >= width || y >= height) return;
 		Camera c(*info, width, height);
 		Ray ray = c.gen_ray(x, y);
-		HitInfo hit_global;
+		Vec3 color{};
+		Vec3 att = Vec3(1, 1, 1);
+		for (int r = 0; r < recursion_levels; r++) {
+			HitInfo hit_global;
 
-		for (int i = 0; i < surface_count; i++) {
-			HitInfo hit;
-			switch (surfaces[i].type) {
-			case SurfaceInfo::PLANE:
-				hit_plane(ray, surfaces[i], hit);
-				break;
-			case SurfaceInfo::SPHERE:
-				hit_sphere(ray, surfaces[i], hit);
-				break;
+			for (int i = 0; i < surface_count; i++) {
+				HitInfo hit;
+				switch (surfaces[i].type) {
+				case SurfaceInfo::PLANE:
+					hit_plane(ray, surfaces[i], hit);
+					break;
+				case SurfaceInfo::SPHERE:
+					hit_sphere(ray, surfaces[i], hit);
+					break;
+				}
+				if (hit.t < hit_global.t) {
+					hit_global = hit;
+					hit_global.surface_index = i;
+				}
 			}
-			if (hit.t < hit_global.t) {
-				hit_global = hit;
-				hit_global.surface_index = i;
+
+			if (hit_global.is_hit) {
+				color += get_light(hit_global, lights, light_count, surfaces, surface_count) * att;
+				// color += get_light(hit_global, lights, light_count, surfaces, surface_count);
+				ray.origin = hit_global.pos;
+				ray.dir = -hit_global.refl_dir;
+				att *= surfaces[hit_global.surface_index].mat.krg;
 			}
 		}
-		// data[pos] = hit_global.is_hit ? vec3_to_abgr(norm(hit_global.norm)) : 0x0;
-		data[pos] = hit_global.is_hit ? get_light(hit_global, lights, light_count, surfaces, surface_count) : 0x0;
-		// data[pos] = hit_global.is_hit ? 0xff5f0000 : 0x0;
+		data[pos] = vec3_to_abgr(color);
 	}
 
 	void Renderer::set_world(SurfaceInfo* surfaces, int count) {
@@ -99,7 +109,7 @@ namespace RTTrace {
 		checkCudaErrors(cudaMemcpy(lights_d, lights, sizeof(LightInfo) * count, cudaMemcpyHostToDevice));
 	}
 
-	void BasicRaytracer::render(float viewport_width, float viewport_height, const CameraInfo& info, abgr_t* data) {
+	void BasicRaytracer::render(float viewport_width, float viewport_height, int recursion_levels, const CameraInfo& info, abgr_t* data) {
 		size_t pixel_count = static_cast<size_t>(viewport_width * viewport_height);
 		// this condition literally saves 1ms HAHAH
 		if (last_res[0] != viewport_width || last_res[1] != viewport_height) {
@@ -117,7 +127,7 @@ namespace RTTrace {
 		checkCudaErrors(cudaMemcpy(info_device, &info, sizeof(CameraInfo), cudaMemcpyHostToDevice));
 
 		checkCudaErrors(cudaDeviceSynchronize());
-		gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, surfaces_d, surface_count, lights_d, light_count);
+		gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, surfaces_d, surface_count, lights_d, light_count, recursion_levels);
 		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaMemcpy(data, data_d, pixel_count * sizeof(abgr_t), cudaMemcpyDeviceToHost));
 	}

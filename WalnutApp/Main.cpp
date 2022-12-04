@@ -29,6 +29,8 @@ public:
 		const glm::vec3 up = input.get_up_dir();
 		ImGui::Text("Up world pos: %.2f %.2f %.2f", up.x, up.y, up.z);
 
+		ImGui::InputScalar("Recursion Depth", ImGuiDataType_U32, &recursion_levels, NULL, NULL, "%d");
+
 		if (ImGui::Button("Render")) {
 			Render();
 		}
@@ -73,6 +75,7 @@ private:
 	LightInfo* light_infos = nullptr;
 	int surface_count;
 	int light_count;
+	int recursion_levels = 2;
 	BasicRaytracer tracer;
 
 	void Render()
@@ -81,7 +84,7 @@ private:
 		size_t pixel_count = static_cast<size_t>(viewport_width * viewport_height);
 
 		if (surface_infos == nullptr) {
-			surface_infos = new SurfaceInfo[2];
+			surface_infos = new SurfaceInfo[3];
 			SurfaceInfo& s0 = surface_infos[0];
 			s0.type = SurfaceInfo::SPHERE;
 			s0.origin = Vec3(1.0, 1.0, -1.0);
@@ -90,17 +93,25 @@ private:
 			s0.mat.kd = Vec3(1.0, 0.7, 0.0);
 			s0.mat.ks = Vec3(1.0, 1.0, 1.0);
 			s0.mat.n = 128;
-			surface_count = 1;
-			SurfaceInfo& s1 = surface_infos[1];
-			s1.type = SurfaceInfo::PLANE;
-			s1.origin = Vec3(0.0, -1.0, -1.0);
-			s1.normal = Vec3(0.0, 1.0, 0.0);
-			s1.mat.ka = Vec3(0.0, 0.0, 0.01);
-			s1.mat.kd = Vec3(0.0, 0.2, 0.5);
+			SurfaceInfo& s2 = surface_infos[1];
+			s2.type = SurfaceInfo::PLANE;
+			s2.origin = Vec3(0.0, -2.0, -2.0);
+			s2.normal = Vec3(0.0, 2.0, 0.0);
+			s2.mat.ka = Vec3(0.0, 0.0, 0.01);
+			s2.mat.kd = Vec3(0.0, 0.2, 0.5);
+			s2.mat.ks = Vec3(1.0, 1.0, 1.0);
+			s2.mat.n = 64;
+			SurfaceInfo& s1 = surface_infos[2];
+			s1.type = SurfaceInfo::SPHERE;
+			s1.origin = Vec3(1.0, 1.0, 2.0);
+			s1.scale = 0.4;
+			s1.mat.ka = Vec3(0.0, 0.3, 0.0);
+			s1.mat.kd = Vec3(0.0, 1.0, 0.4);
 			s1.mat.ks = Vec3(1.0, 1.0, 1.0);
 			s1.mat.n = 64;
-			surface_count = 2;
+			surface_count = 3;
 			/*
+			surface_count = 2;
 			*/
 			tracer.set_world(surface_infos, surface_count);
 		}
@@ -109,7 +120,7 @@ private:
 			light_infos = new LightInfo[1];
 			LightInfo& l0 = light_infos[0];
 			l0.type = LightInfo::POINT;
-			l0.origin = Vec3(0.0, 2.0, 2.0);
+			l0.origin = Vec3(1.0, 1.0, 4.0);
 			l0.color = Vec3(1.0, 1.0, 1.0);
 			l0.intensity = 1.0f;
 			light_count = 1;
@@ -122,14 +133,7 @@ private:
 
 		data = new abgr_t[pixel_count];
 
-		tracer.render(viewport_width, viewport_height, input.get_cam_info(), data);
-
-		// PLACEHOLDER RED
-		/*
-		for (size_t i{}; i < pixel_count; i++) {
-			data[i] = 0xff0000ff;
-		}
-		*/
+		tracer.render(viewport_width, viewport_height, recursion_levels, input.get_cam_info(), data);
 
 		last_render_time = timer.ElapsedMillis();
 

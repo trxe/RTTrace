@@ -25,16 +25,25 @@ namespace RTTrace {
 			u[0] * v[1] - u[1] * v[0]);
 	}
 
+	__host__ __device__ Vec3 clamp(const Vec3& u, const Vec3& min, const Vec3& max) {
+		Vec3 uclamp = u;
+		for (int i = 0; i < 3; i++) {
+			uclamp[i] = fminf(max[i], uclamp[i]);
+			uclamp[i] = fmaxf(min[i], uclamp[i]);
+		}
+		return uclamp;
+	}
+
+	__host__ __device__ Vec3 clamp_color(const Vec3& u) {
+		return clamp(u, Vec3(), Vec3(1.0, 1.0, 1.0));
+	}
+
 	__host__ __device__ abgr_t vec3_to_abgr(const Vec3 &u) {
 		abgr_t result;
-		Vec3 unorm = u;
-		for (int i = 0; i < 3; i++) {
-			unorm[i] = fminf(1.0, unorm[i]);
-			unorm[i] = fmaxf(0.0, unorm[i]);
-		}
-		int r = (int)(unorm[0] * 255.0);
-		int g = (int)(unorm[1] * 255.0);
-		int b = (int)(unorm[2] * 255.0);
+		Vec3 uclamp = clamp_color(u);
+		int r = (int)(uclamp[0] * 255.0);
+		int g = (int)(uclamp[1] * 255.0);
+		int b = (int)(uclamp[2] * 255.0);
 		result = 0xff000000 | (abgr_t)b << 16 | (abgr_t)g << 8 | (abgr_t)r;
 		return result;
 	}
