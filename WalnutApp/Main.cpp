@@ -8,6 +8,7 @@
 #include "InputHandler.h"
 
 #include "Light.cuh"
+#include "Mat.cuh"
 #include "Renderer.cuh"
 #include "Surface.cuh"
 #include "Utils.cuh"
@@ -36,6 +37,7 @@ public:
 		}
 		if (last_render_time >= 0) {
 			ImGui::Text("Render Time: %.3f ms", last_render_time);
+			ImGui::Text("FPS: %d", (int)(1000.0 / last_render_time));
 		}
 		ImGui::End();
 
@@ -95,6 +97,7 @@ private:
 			s0.mat.krg = Vec3(0.3, 0.3, 0.3);
 			s0.mat.n = 128;
 			surface_count = 1;
+			/*
 			SurfaceInfo& s1 = surface_infos[1];
 			s1.type = SurfaceInfo::SPHERE;
 			s1.origin = Vec3(1.0, 1.0, 2.0);
@@ -103,18 +106,31 @@ private:
 			s1.mat.kd = Vec3(0.0, 1.0, 0.4);
 			s1.mat.ks = Vec3(1.0, 1.0, 1.0);
 			s1.mat.n = 64;
+			*/
 			surface_count = 2;
-			/*
 			SurfaceInfo& s2 = surface_infos[2];
 			s2.type = SurfaceInfo::PLANE;
 			s2.origin = Vec3(0.0, -2.0, -2.0);
 			s2.normal = Vec3(0.0, 2.0, 0.0);
-			s2.mat.ka = Vec3(0.0, 0.0, 0.01);
+			s2.mat.ka = Vec3(0.0, 0.0, 0.1);
 			s2.mat.kd = Vec3(0.0, 0.2, 0.5);
 			s2.mat.ks = Vec3(1.0, 1.0, 1.0);
 			s2.mat.krg = Vec3(0.8, 0.8, 0.8);
 			s2.mat.n = 64;
 			surface_count = 3;
+			SurfaceInfo& s3 = surface_infos[1];
+			s3.type = SurfaceInfo::TRIANGLE;
+			s3.points[0] = Vec3(1.0, -0.4, 3.0);
+			s3.points[1] = Vec3(1.0, -0.4, 0.0);
+			s3.points[2] = Vec3(2.0, -0.4, 2.0);
+			s3.normal = Vec3(0.0, 1.0, 0.0);
+			s3.mat.ka = Vec3(0.1, 0.0, 0.0);
+			s3.mat.kd = Vec3(0.7, 0.0, 0.4);
+			s3.mat.ks = Vec3(1.0, 1.0, 1.0);
+			s3.mat.krg = Vec3(0.8, 0.8, 0.8);
+			s3.mat.n = 64;
+			surface_count = 3;
+			/*
 			*/
 			tracer.set_world(surface_infos, surface_count);
 		}

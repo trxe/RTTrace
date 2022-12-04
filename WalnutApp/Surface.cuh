@@ -36,16 +36,19 @@ namespace RTTrace {
 	};
 
 	struct SurfaceInfo {
-		enum Type { SPHERE, PLANE };
+		enum Type { SPHERE, PLANE, TRIANGLE };
 		Type type;
 		Vec3 origin;
 		Vec3 normal;
 		float scale;
+		// used for triangle
+		Vec3 points[3]{ origin, origin, origin };
 		MaterialInfo mat;
 	};
 
 	__device__ bool hit_sphere(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);
 	__device__ bool hit_plane(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);
+	__device__ bool hit_triangle(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);
 
 }
 

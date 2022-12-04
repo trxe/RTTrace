@@ -1,3 +1,4 @@
+#include "Mat.cuh"
 #include "Surface.cuh"
 #include "Vec3.cuh"
 
@@ -38,6 +39,29 @@ namespace RTTrace {
 		hit.pos = ray.point(t); // dir must be unit vector
 		hit.norm = normal;
 		return true;	
+	}
+
+	__device__ bool hit_triangle(const Ray& ray, const SurfaceInfo& surface, HitInfo& hit) {
+		const Vec3& rd = ray.dir;
+		const Vec3& ro = ray.origin;
+		Vec3& ba = surface.points[1] - surface.points[0];
+		Vec3& ca = surface.points[2] - surface.points[0];
+		Vec3& roa = ro - surface.points[0];
+		Mat3 b_m{ roa, ca, rd };
+		Mat3 g_m{ ba, roa, rd };
+		Mat3 t_m{ ba, ca, roa };
+		float len_a = surface.points[0].len();
+		float beta = det(b_m) / len_a;
+		float gamma = det(g_m) / len_a;
+		float t = det(t_m) / len_a;
+		if (t < T_EPSILON || t > T_MAX) return false;
+		if (beta + gamma >= 1 || beta < 0 || gamma < 0) return false;
+		hit.is_hit = true;
+		hit.t = t;
+		hit.view_dir = rd;
+		hit.pos = ray.point(t); // dir must be unit vector
+		hit.norm = norm(cross(ca, ba));
+		return false;
 	}
 
 }

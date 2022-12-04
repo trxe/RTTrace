@@ -31,6 +31,9 @@ namespace RTTrace {
 				case SurfaceInfo::SPHERE:
 					hit_sphere(shadow_ray, surfaces[s], shadow_hit);
 					break;
+				case SurfaceInfo::TRIANGLE:
+					hit_triangle(shadow_ray, surfaces[s], shadow_hit);
+					break;
 				}
 			}
 			if (!shadow_hit.is_hit) {
@@ -49,8 +52,10 @@ namespace RTTrace {
 		return color;
 	}
 
-	// __global__ void gpu_render(const CameraInfo* info, int width, int height, abgr_t* data, const SurfaceInfo* surfaces, int surface_count) {
-	__global__ void gpu_render(const CameraInfo* info, int width, int height, abgr_t* data, const SurfaceInfo* surfaces, int surface_count, const LightInfo* lights, int light_count, int recursion_levels) {
+	__global__ void gpu_render(
+			const CameraInfo* info, int width, int height, abgr_t* data, 
+			const SurfaceInfo* surfaces, int surface_count, 
+			const LightInfo* lights, int light_count, int recursion_levels) {
 		int x = blockIdx.x * blockDim.x + threadIdx.x;
 		int y = blockIdx.y * blockDim.y + threadIdx.y;
 		// need to invert position
@@ -71,6 +76,9 @@ namespace RTTrace {
 					break;
 				case SurfaceInfo::SPHERE:
 					hit_sphere(ray, surfaces[i], hit);
+					break;
+				case SurfaceInfo::TRIANGLE:
+					hit_triangle(ray, surfaces[i], hit);
 					break;
 				}
 				if (hit.t < hit_global.t) {
