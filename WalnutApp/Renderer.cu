@@ -18,19 +18,18 @@ namespace RTTrace {
 		Vec3 color;
 		for (int i = 0; i < light_count; i++) {
 			const LightInfo& l = lights[i];
-			// Ray shadow_ray{hit.pos, l.origin - hit.pos};
 			Ray shadow_ray{hit.pos, l.origin - hit.pos};
 			HitInfo shadow_hit;
-			for (int s = 0; s < surface_count; s++) {
+			for (int s = 0; s < surface_count && !shadow_hit.is_hit; s++) {
 				// ignore this surface.
-				if (i == hit.surface_index) continue;
+				if (s == hit.surface_index) continue;
 
-				switch (surfaces[i].type) {
+				switch (surfaces[s].type) {
 				case SurfaceInfo::PLANE:
-					hit_plane(shadow_ray, surfaces[i], shadow_hit);
+					hit_plane(shadow_ray, surfaces[s], shadow_hit);
 					break;
 				case SurfaceInfo::SPHERE:
-					hit_sphere(shadow_ray, surfaces[i], shadow_hit);
+					hit_sphere(shadow_ray, surfaces[s], shadow_hit);
 					break;
 				}
 			}
@@ -38,9 +37,9 @@ namespace RTTrace {
 				float n_dot_l = dot(hit.norm, shadow_ray.dir);
 				if (n_dot_l <= 0.0) continue;
 				color += l.color * surface.mat.kd * l.intensity * n_dot_l;
-				Vec3 r = reflect(-shadow_ray.dir, hit.norm);
+				Vec3 r = reflect(shadow_ray.dir, hit.norm);
 				hit.refl_dir = r;
-				float r_dot_v = fmaxf(0, dot(norm(r), norm(hit.view_dir)));
+				float r_dot_v = fmaxf(0, dot(r, norm(-hit.view_dir)));
 				float r_dot_v_pow_n = powf(r_dot_v, surface.mat.n);
 				Vec3 specular = l.color * surface.mat.ks * l.intensity * r_dot_v_pow_n;
 				color += specular;
@@ -61,7 +60,7 @@ namespace RTTrace {
 		Ray ray = c.gen_ray(x, y);
 		Vec3 color{};
 		Vec3 att = Vec3(1, 1, 1);
-		for (int r = 0; r < recursion_levels; r++) {
+		for (int r = 0; r <= recursion_levels; r++) {
 			HitInfo hit_global;
 
 			for (int i = 0; i < surface_count; i++) {
@@ -82,10 +81,10 @@ namespace RTTrace {
 
 			if (hit_global.is_hit) {
 				color += get_light(hit_global, lights, light_count, surfaces, surface_count) * att;
-				// color += get_light(hit_global, lights, light_count, surfaces, surface_count);
-				ray.origin = hit_global.pos;
-				ray.dir = -hit_global.refl_dir;
+				// set up next level of recursion: light and reflection ray
 				att *= surfaces[hit_global.surface_index].mat.krg;
+				ray.origin = hit_global.pos;
+				ray.dir = norm(hit_global.refl_dir);
 			}
 		}
 		data[pos] = vec3_to_abgr(color);

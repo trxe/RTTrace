@@ -21,12 +21,12 @@ namespace RTTrace {
 		hit.is_hit = true;
 		hit.t = t;
 		hit.view_dir = rd;
-		hit.pos = ray.point(t);
+		hit.pos = ray.point(t); // dir must be unit vector
 		hit.norm = norm(hit.pos - origin);
 		return true;
 	}
 	__device__ bool hit_plane (const Ray& ray, const SurfaceInfo& surface, HitInfo& hit) {
-		Vec3 normal = surface.normal;
+		Vec3 normal = norm(surface.normal);
 		Vec3 d = norm(ray.dir);
 		float n_dot_dir = dot(normal, d);
 		if (n_dot_dir == 0) return false; // ray parallel to plane
@@ -35,7 +35,7 @@ namespace RTTrace {
 		hit.is_hit = true;
 		hit.t = t;
 		hit.view_dir = d;
-		hit.pos = ray.point(t);
+		hit.pos = ray.point(t); // dir must be unit vector
 		hit.norm = normal;
 		return true;	
 	}

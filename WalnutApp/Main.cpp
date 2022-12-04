@@ -92,16 +92,10 @@ private:
 			s0.mat.ka = Vec3(0.2, 0.0, 0.0);
 			s0.mat.kd = Vec3(1.0, 0.7, 0.0);
 			s0.mat.ks = Vec3(1.0, 1.0, 1.0);
+			s0.mat.krg = Vec3(0.3, 0.3, 0.3);
 			s0.mat.n = 128;
-			SurfaceInfo& s2 = surface_infos[1];
-			s2.type = SurfaceInfo::PLANE;
-			s2.origin = Vec3(0.0, -2.0, -2.0);
-			s2.normal = Vec3(0.0, 2.0, 0.0);
-			s2.mat.ka = Vec3(0.0, 0.0, 0.01);
-			s2.mat.kd = Vec3(0.0, 0.2, 0.5);
-			s2.mat.ks = Vec3(1.0, 1.0, 1.0);
-			s2.mat.n = 64;
-			SurfaceInfo& s1 = surface_infos[2];
+			surface_count = 1;
+			SurfaceInfo& s1 = surface_infos[1];
 			s1.type = SurfaceInfo::SPHERE;
 			s1.origin = Vec3(1.0, 1.0, 2.0);
 			s1.scale = 0.4;
@@ -109,9 +103,18 @@ private:
 			s1.mat.kd = Vec3(0.0, 1.0, 0.4);
 			s1.mat.ks = Vec3(1.0, 1.0, 1.0);
 			s1.mat.n = 64;
-			surface_count = 3;
-			/*
 			surface_count = 2;
+			/*
+			SurfaceInfo& s2 = surface_infos[2];
+			s2.type = SurfaceInfo::PLANE;
+			s2.origin = Vec3(0.0, -2.0, -2.0);
+			s2.normal = Vec3(0.0, 2.0, 0.0);
+			s2.mat.ka = Vec3(0.0, 0.0, 0.01);
+			s2.mat.kd = Vec3(0.0, 0.2, 0.5);
+			s2.mat.ks = Vec3(1.0, 1.0, 1.0);
+			s2.mat.krg = Vec3(0.8, 0.8, 0.8);
+			s2.mat.n = 64;
+			surface_count = 3;
 			*/
 			tracer.set_world(surface_infos, surface_count);
 		}
@@ -120,7 +123,7 @@ private:
 			light_infos = new LightInfo[1];
 			LightInfo& l0 = light_infos[0];
 			l0.type = LightInfo::POINT;
-			l0.origin = Vec3(1.0, 1.0, 4.0);
+			l0.origin = Vec3(1.0, 3.0, 2.0);
 			l0.color = Vec3(1.0, 1.0, 1.0);
 			l0.intensity = 1.0f;
 			light_count = 1;
