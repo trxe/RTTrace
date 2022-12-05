@@ -46,7 +46,7 @@ namespace RTTrace {
 		const Vec3& ro = ray.origin;
 		Vec3& ba = surface.points[1] - surface.points[0];
 		Vec3& ca = surface.points[2] - surface.points[0];
-		Vec3 normal = norm(cross(ba, ca));
+		Vec3 normal = norm(cross(ca, ba));
 		// Check intersection with the plane
 		float n_dot_dir = dot(normal, rd);
 		if (n_dot_dir == 0) return false; // ray parallel to plane

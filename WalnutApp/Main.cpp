@@ -120,9 +120,9 @@ private:
 			surface_count = 3;
 			SurfaceInfo& s3 = surface_infos[1];
 			s3.type = SurfaceInfo::TRIANGLE;
-			s3.points[0] = Vec3(0.0, 0.3, 3.0);
-			s3.points[1] = Vec3(0.3, 0.0, 3.0);
-			s3.points[2] = Vec3(0.0, 0.0, 3.0);
+			s3.points[0] = Vec3(0.0, 1.0, 0.3);
+			s3.points[1] = Vec3(0.0, 1.0, 0.0);
+			s3.points[2] = Vec3(0.3, 1.0, 0.0);
 			s3.normal = Vec3(0.0, 1.0, 0.0);
 			s3.mat.ka = Vec3(0.1, 0.0, 0.0);
 			s3.mat.kd = Vec3(0.7, 0.0, 0.4);

@@ -15,6 +15,8 @@ namespace RTTrace {
 	__device__ Vec3 get_light(HitInfo& hit, const LightInfo* lights, int light_count, const SurfaceInfo* surfaces, int surface_count) {
 		if (hit.surface_index < 0) return 0x0;
 		const SurfaceInfo& surface = surfaces[hit.surface_index];
+		// Back face culling
+		if (dot(hit.norm, hit.view_dir) > 0) return surface.mat.ka;
 		Vec3 color;
 		for (int i = 0; i < light_count; i++) {
 			const LightInfo& l = lights[i];
