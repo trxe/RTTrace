@@ -46,21 +46,24 @@ namespace RTTrace {
 		const Vec3& ro = ray.origin;
 		Vec3& ba = surface.points[1] - surface.points[0];
 		Vec3& ca = surface.points[2] - surface.points[0];
-		Vec3& roa = ro - surface.points[0];
-		Mat3 b_m{ roa, ca, rd };
-		Mat3 g_m{ ba, roa, rd };
-		Mat3 t_m{ ba, ca, roa };
-		float len_a = surface.points[0].len();
-		float beta = det(b_m) / len_a;
-		float gamma = det(g_m) / len_a;
-		float t = det(t_m) / len_a;
+		Vec3 normal = norm(cross(ba, ca));
+		// Check intersection with the plane
+		float n_dot_dir = dot(normal, rd);
+		if (n_dot_dir == 0) return false; // ray parallel to plane
+		float t = dot(normal, surface.points[0] - ray.origin) / n_dot_dir;
 		if (t < T_EPSILON || t > T_MAX) return false;
-		if (beta + gamma >= 1 || beta < 0 || gamma < 0) return false;
+		// Naive geometric method (anti-clockwise handedness)
+		Vec3 p = ray.point(t);
+		Vec3 cb = surface.points[2] - surface.points[1];
+		Vec3 ac = -ca;
+		if (dot(ba, p - surface.points[0]) < 0 ||
+			dot(cb, p - surface.points[1]) < 0 ||
+			dot(ac, p - surface.points[2]) < 0) return false;
 		hit.is_hit = true;
 		hit.t = t;
+		hit.pos = p;
 		hit.view_dir = rd;
-		hit.pos = ray.point(t); // dir must be unit vector
-		hit.norm = norm(cross(ca, ba));
+		hit.norm = normal;
 		return false;
 	}
 

@@ -67,6 +67,11 @@ namespace RTTrace {
 			return Vec3(a[0] * v[0], a[1] * v[1], a[2] * v[2]);
 		}
 
+		__host__ __device__ bool operator!=(const Vec3& v) const {
+			return a[0] == v[0] && a[1] == v[1] && a[2] == v[2];
+		}
+
+
 	private:
 		float a[3];
 	};
