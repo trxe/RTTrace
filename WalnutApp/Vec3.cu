@@ -16,6 +16,8 @@ namespace RTTrace {
 	}
 
 	__host__ __device__ Vec3 norm(const Vec3& u) {
+		float l = u.len();
+		if (l == 0) return u;
 		return u / u.len();
 	}
 

@@ -18,17 +18,17 @@ namespace RTTrace {
 	public:
 		Camera() = delete;
 
-		__device__ Camera(const CameraInfo& info, int res_x, int res_y) : res_x(res_x), res_y(res_y), focal_dist(info.focal_dist) {
-			eye = Vec3(info.eye);
-			at = Vec3(info.at);
-			up = Vec3(info.up);
+		__device__ Camera(const CameraInfo& bound, int res_x, int res_y) : res_x(res_x), res_y(res_y), focal_dist(bound.focal_dist) {
+			eye = Vec3(bound.eye);
+			at = Vec3(bound.at);
+			up = Vec3(bound.up);
 			z = norm(eye - at);
 			x = norm(cross(up, z));
 			y = norm(cross(z, x));
 
 			// default perspective
 			aspect = (float)res_x / (float)res_y;
-			fovy_rad = info.fovy * M_PI / 180;
+			fovy_rad = bound.fovy * M_PI / 180;
 			image_height = focal_dist * tan(fovy_rad / 2.0) * 2.0;
 			image_width = aspect * image_height;
 			pixel_width = image_width / (float)res_x;

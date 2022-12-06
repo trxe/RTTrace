@@ -35,17 +35,26 @@ namespace RTTrace {
 		float mu = 1; // refractive index
 	};
 
+	struct AABB {
+		bool active = false;
+		Vec3 minw;
+		Vec3 maxw;
+	};
+
 	struct SurfaceInfo {
 		enum Type { SPHERE, PLANE, TRIANGLE };
 		Type type;
-		Vec3 origin;
-		Vec3 normal;
-		float scale;
-		// used for triangle
-		Vec3 points[3]{ origin, origin, origin };
+		Vec3 origin; // PLANE
+		Vec3 normal; //PLANE
+		float scale; // SPHERE
+		Vec3 points[3]{ origin, origin, origin }; // TRIANGLE
 		MaterialInfo mat;
+		AABB bound;
 	};
 
+	__host__ bool init_bound(SurfaceInfo& surface);
+
+	__device__ bool hit_bound(const Ray& r, const SurfaceInfo& surface);
 	__device__ bool hit_sphere(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);
 	__device__ bool hit_plane(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);
 	__device__ bool hit_triangle(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);

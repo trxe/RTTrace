@@ -20,9 +20,24 @@ namespace RTTrace {
 		 * \param data Image data in abgr_t format
 		 * \return 
 		 */
+		virtual void render(float viewport_width, float viewport_height, int recursion_levels, const CameraInfo& bound, abgr_t* data) = 0;
+
+		/**
+		 * Blocking call to send all world shapes/surfaces to global memory. Non-blocking feature WIP.
+		 * 
+		 * \param surfaces Array of surfaces
+		 * \param count Number of surfaces to send
+		 */
 		virtual void set_world(SurfaceInfo* surfaces, int count);
+
+		/**
+		 * Blocking call to send all lights to global memory. Only supports point lights currently.
+		 * Non-blocking call and area lights WIP.
+		 * 
+		 * \param lights Array of lights
+		 * \param count Number of lights to send
+		 */
 		virtual void set_lights(LightInfo* lights, int count);
-		virtual void render(float viewport_width, float viewport_height, int recursion_levels, const CameraInfo& info, abgr_t* data) = 0;
 	protected:
 		SurfaceInfo* surfaces_d;
 		int surface_count;
@@ -33,7 +48,7 @@ namespace RTTrace {
 
 	class BasicRaytracer : public Renderer {
 	public:
-		virtual void render(float viewport_width, float viewport_height, int recursion_levels, const CameraInfo& info, abgr_t* data) override;
+		virtual void render(float viewport_width, float viewport_height, int recursion_levels, const CameraInfo& bound, abgr_t* data) override;
 	private:
 		float last_res[2];
 	};

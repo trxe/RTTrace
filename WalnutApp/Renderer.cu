@@ -55,7 +55,7 @@ namespace RTTrace {
 	}
 
 	__global__ void gpu_render(
-			const CameraInfo* info, int width, int height, abgr_t* data, 
+			const CameraInfo* bound, int width, int height, abgr_t* data, 
 			const SurfaceInfo* surfaces, int surface_count, 
 			const LightInfo* lights, int light_count, int recursion_levels) {
 		int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -63,14 +63,14 @@ namespace RTTrace {
 		// need to invert position
 		int pos = (height - y) * width + (width - x);
 		if (x >= width || y >= height) return;
-		Camera c(*info, width, height);
+		Camera c(*bound, width, height);
 		Ray ray = c.gen_ray(x, y);
 		Vec3 color{};
 		Vec3 att = Vec3(1, 1, 1);
 		for (int r = 0; r <= recursion_levels; r++) {
 			HitInfo hit_global;
-
 			for (int i = 0; i < surface_count; i++) {
+				if (!hit_bound(ray, surfaces[i])) continue;
 				HitInfo hit;
 				switch (surfaces[i].type) {
 				case SurfaceInfo::PLANE:
@@ -80,7 +80,7 @@ namespace RTTrace {
 					hit_sphere(ray, surfaces[i], hit);
 					break;
 				case SurfaceInfo::TRIANGLE:
-					hit_triangle(ray, surfaces[i], hit);
+					bool test = hit_triangle(ray, surfaces[i], hit);
 					break;
 				}
 				if (hit.t < hit_global.t) {
@@ -101,6 +101,9 @@ namespace RTTrace {
 	}
 
 	void Renderer::set_world(SurfaceInfo* surfaces, int count) {
+		for (int i = 0; i < count; i++) {
+			init_bound(surfaces[i]);
+		}
 		surface_count = count;
 		if (surfaces_d != nullptr) {
 			checkCudaErrors(cudaFree(&surfaces_d));
@@ -118,7 +121,7 @@ namespace RTTrace {
 		checkCudaErrors(cudaMemcpy(lights_d, lights, sizeof(LightInfo) * count, cudaMemcpyHostToDevice));
 	}
 
-	void BasicRaytracer::render(float viewport_width, float viewport_height, int recursion_levels, const CameraInfo& info, abgr_t* data) {
+	void BasicRaytracer::render(float viewport_width, float viewport_height, int recursion_levels, const CameraInfo& bound, abgr_t* data) {
 		size_t pixel_count = static_cast<size_t>(viewport_width * viewport_height);
 		// this condition literally saves 1ms HAHAH
 		if (last_res[0] != viewport_width || last_res[1] != viewport_height) {
@@ -133,7 +136,7 @@ namespace RTTrace {
 
 		CameraInfo* info_device;
 		checkCudaErrors(cudaMalloc(&info_device, sizeof(CameraInfo)));
-		checkCudaErrors(cudaMemcpy(info_device, &info, sizeof(CameraInfo), cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(info_device, &bound, sizeof(CameraInfo), cudaMemcpyHostToDevice));
 
 		checkCudaErrors(cudaDeviceSynchronize());
 		gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, surfaces_d, surface_count, lights_d, light_count, recursion_levels);

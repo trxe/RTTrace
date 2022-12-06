@@ -3,6 +3,55 @@
 #include "Vec3.cuh"
 
 namespace RTTrace {
+	__host__ bool init_bound(SurfaceInfo& surface) {
+		AABB& bound = surface.bound;
+		switch (surface.type) {
+		case SurfaceInfo::PLANE:
+			bound.active = false;
+			return false;
+		case SurfaceInfo::SPHERE:
+		{
+			Vec3 unit = Vec3(surface.scale, surface.scale, surface.scale);
+			bound.minw = surface.origin - unit;
+			bound.maxw = surface.origin + unit;
+			bound.active = true;
+		}
+			return true;
+		case SurfaceInfo::TRIANGLE:
+			bound.minw = surface.points[0];
+			bound.maxw = surface.points[0];
+			for (int p = 1; p < 3; p++) {
+				for (int axis = 0; axis < 3; axis++) {
+					bound.minw[axis] = std::min(surface.points[p][axis], bound.minw[axis]);
+					bound.maxw[axis] = std::max(surface.points[p][axis], bound.maxw[axis]);
+				}
+			}
+			bound.active = true;
+			return true;
+		}
+	}
+
+	__device__ bool hit_bound(const Ray& r, const SurfaceInfo& surface) {
+		const AABB& bound = surface.bound;
+		const Vec3& ro = r.origin;
+		const Vec3& rd = r.dir;
+		if (!bound.active) return true;
+		float tming = T_EPSILON, tmaxg = T_MAX;
+		for (int axis = 0; axis < 3; axis++) {
+			float tmin = (bound.minw[axis] - ro[axis]) / rd[axis];
+			float tmax = (bound.maxw[axis] - ro[axis]) / rd[axis];
+			if (tmin > tmax) {
+				float t = tmin;
+				tmin = tmax;
+				tmax = t;
+			}
+			tming = fmaxf(tmin, tming);
+			tmaxg = fminf(tmax, tmaxg);
+			if (tmaxg < tming) return false;
+		}
+		return true;
+	}
+
 	__device__ bool hit_sphere (const Ray& ray, const SurfaceInfo& surface, HitInfo& hit) {
 		Vec3 origin = surface.origin;
 		float radius = surface.scale;
