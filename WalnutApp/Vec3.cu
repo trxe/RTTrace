@@ -19,6 +19,14 @@ namespace RTTrace {
 		return u / u.len();
 	}
 
+	__host__ __device__ float det(const Vec3& c0, const Vec3& c1, const Vec3& c2) {
+		float d = 0;
+		d += c0[0] * (c1[1] * c2[2] - c1[2] * c2[1]);
+		d -= c1[0] * (c0[1] * c2[2] - c0[2] * c2[1]);
+		d += c2[0] * (c0[1] * c1[2] - c0[2] * c1[1]);
+		return d;
+	}
+
 	__host__ __device__ Vec3 cross(const Vec3 &u, const Vec3 &v) {
 		return Vec3(u[1] * v[2] - u[2] * v[1],
 			u[2] * v[0] - u[0] * v[2],

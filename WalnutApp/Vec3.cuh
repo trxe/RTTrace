@@ -81,6 +81,7 @@ namespace RTTrace {
 	__host__ __device__ Vec3 reflect(const Vec3& l, const Vec3& n);
 	__host__ __device__ Vec3 cross(const Vec3& u, const Vec3& v);
 	__host__ __device__ Vec3 norm(const Vec3& u);
+	__host__ __device__ float det(const Vec3& c1, const Vec3& c2, const Vec3& c3);
 	__host__ __device__ Vec3 clamp(const Vec3& u, const Vec3& min, const Vec3& max);
 	__host__ __device__ Vec3 clamp_color(const Vec3& u);
 	__host__ __device__ abgr_t vec3_to_abgr(const Vec3& u);
