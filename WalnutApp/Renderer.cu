@@ -8,7 +8,7 @@
 #include "Surface.cuh"
 #include "Utils.cuh"
 
-#define BLOCK_LENGTH 32
+#define BLOCK_LENGTH 16
 
 namespace RTTrace {
 
@@ -25,6 +25,7 @@ namespace RTTrace {
 			for (int s = 0; s < surface_count && !shadow_hit.is_hit; s++) {
 				// ignore this surface.
 				if (s == hit.surface_index) continue;
+				if (!hit_bound(shadow_ray, surfaces[i])) continue;
 
 				switch (surfaces[s].type) {
 				case SurfaceInfo::PLANE:
@@ -80,7 +81,7 @@ namespace RTTrace {
 					hit_sphere(ray, surfaces[i], hit);
 					break;
 				case SurfaceInfo::TRIANGLE:
-					bool test = hit_triangle(ray, surfaces[i], hit);
+					hit_triangle(ray, surfaces[i], hit);
 					break;
 				}
 				if (hit.t < hit_global.t) {
@@ -131,6 +132,7 @@ namespace RTTrace {
 			checkCudaErrors(cudaMalloc(&data_d, pixel_count * sizeof(abgr_t)));
 		}
 
+		// int block_length = cuda
 		dim3 gridDim(ceil(viewport_width / BLOCK_LENGTH), ceil(viewport_height / BLOCK_LENGTH));
 		dim3 blockDim(BLOCK_LENGTH, BLOCK_LENGTH);
 
