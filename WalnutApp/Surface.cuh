@@ -42,7 +42,7 @@ namespace RTTrace {
 	};
 
 	struct SurfaceInfo {
-		enum Type { SPHERE, PLANE, TRIANGLE };
+		enum Type { SPHERE, PLANE, TRIANGLE, BVH };
 		Type type;
 		Vec3 origin; // PLANE
 		Vec3 normal; //PLANE

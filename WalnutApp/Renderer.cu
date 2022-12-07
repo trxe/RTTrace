@@ -9,6 +9,7 @@
 #include "Utils.cuh"
 
 #define BLOCK_LENGTH 16
+#define ACC_BLOCK_SIZE 512
 
 namespace RTTrace {
 
@@ -99,6 +100,23 @@ namespace RTTrace {
 			}
 		}
 		data[pos] = vec3_to_abgr(color);
+	}
+
+	__global__ void create_accel_structure(SurfaceInfo* surfaces, int count, const AABB& global_aabb) {
+		int tid = blockIdx.x * blockDim.x + threadIdx.x;
+		if (tid >= count) return;
+		__shared__ uint32_t morton_codes[ACC_BLOCK_SIZE];
+		SurfaceInfo& surface = surfaces[tid];
+		// set centroids
+		switch (surface.type) {
+		case SurfaceInfo::TRIANGLE:
+			Vec3 sum = surface.points[0] + surface.points[1] + surface.points[2];
+			surface.origin = sum / 3.0;
+			break;
+		}
+		morton_codes[tid] = generate_morton_code(surface.origin, global_aabb.minw, global_aabb.maxw);
+		__syncthreads();
+		// Fast HLBVH construction on GPUs
 	}
 
 	void Renderer::set_world(SurfaceInfo* surfaces, int count) {

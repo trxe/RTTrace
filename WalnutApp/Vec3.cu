@@ -48,6 +48,15 @@ namespace RTTrace {
 		return clamp(u, Vec3(), Vec3(1.0, 1.0, 1.0));
 	}
 
+	__host__ __device__ Vec3 inverse_lerp(const Vec3& u, const Vec3& min, const Vec3& max) {
+		Vec3 t{};
+		for (int i = 0; i < 3; i++) {
+			if (min[i] == max[i]) t[i] = NAN;
+			t[i] = (u[i] - min[i]) / (max[i] - min[i]);
+		}
+		return t;
+	}
+
 	__host__ __device__ abgr_t vec3_to_abgr(const Vec3 &u) {
 		abgr_t result;
 		Vec3 uclamp = clamp_color(u);

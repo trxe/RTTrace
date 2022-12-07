@@ -38,6 +38,7 @@ namespace RTTrace {
 		 * \param count Number of lights to send
 		 */
 		virtual void set_lights(LightInfo* lights, int count);
+
 	protected:
 		SurfaceInfo* surfaces_d;
 		int surface_count;

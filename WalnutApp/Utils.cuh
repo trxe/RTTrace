@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include "cuda_runtime.h"
 
+#include "Vec3.cuh"
+
 using abgr_t = uint32_t;
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
@@ -19,5 +21,19 @@ namespace RTTrace {
 		float fovy = 45; // in degrees
 		float focal_dist = 5; // in camera space
 	};
+
+	/**
+	 * Mortion bit shifting pre-req for generating morton codes.
+	 */
+	__host__ __device__ uint32_t left_shift_3(uint32_t x);
+
+	/**
+	 * Generates morton code required for LBVH generation.
+	 * 
+	 * \param pos World space coordinates of centroid of object.
+	 * \param global_min World space coordinates of the minimum point on the global AABB.
+	 * \param global_max World space coordinates of the maximum point on the global AABB.
+	 */
+	__host__ __device__ uint32_t generate_morton_code(const Vec3& pos, const Vec3& global_min, const Vec3& global_max);
 }
 #endif
