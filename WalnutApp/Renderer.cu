@@ -7,6 +7,7 @@
 #include "Renderer.cuh"
 #include "Surface.cuh"
 #include "Utils.cuh"
+#include "Vec3.cuh"
 
 #define BLOCK_LENGTH 16
 #define ACC_BLOCK_SIZE 512

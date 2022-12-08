@@ -44,10 +44,24 @@ namespace RTTrace {
 		return uclamp;
 	}
 
+	/**
+	 * Clamps vector to a color ranging between WHITE and BLACK.
+	 * 
+	 * \param u Unclamped Vector
+	 * \return Color after clamping
+	 */
 	__host__ __device__ Vec3 clamp_color(const Vec3& u) {
 		return clamp(u, Vec3(), Vec3(1.0, 1.0, 1.0));
 	}
 
+	/**
+	 * Finds the Vec3 of parameters t yielding the interpolated u between min and max.
+	 * 
+	 * \param u Resultant interpolated vector
+	 * \param min Min vector
+	 * \param max Max vector
+	 * \return Vec3 of parameters such that lerp(t, min, max) is u
+	 */
 	__host__ __device__ Vec3 inverse_lerp(const Vec3& u, const Vec3& min, const Vec3& max) {
 		Vec3 t{};
 		for (int i = 0; i < 3; i++) {
@@ -57,6 +71,13 @@ namespace RTTrace {
 		return t;
 	}
 
+	/**
+	 * Generates morton code required for LBVH generation.
+	 * 
+	 * \param pos World space coordinates of centroid of object.
+	 * \param global_min World space coordinates of the minimum point on the global AABB.
+	 * \param global_max World space coordinates of the maximum point on the global AABB.
+	 */
 	__host__ __device__ abgr_t vec3_to_abgr(const Vec3 &u) {
 		abgr_t result;
 		Vec3 uclamp = clamp_color(u);
@@ -74,5 +95,16 @@ namespace RTTrace {
 		}
 		os << "}";
 		return os;
+	}
+
+	__host__ __device__ uint32_t generate_morton_code(const Vec3& pos, const Vec3& global_min, const Vec3& global_max) {
+		uint32_t morton = 0x0;
+		Vec3 rel_pos = inverse_lerp(pos, global_min, global_max);
+		for (int i = 0; i < 3; i++) {
+			uint32_t v = fminf(fmaxf(0.0, pos[i] * 1024.0), 1023.0);
+			uint32_t vv = left_shift_3(v);
+			morton += vv << (2 - i);
+		}
+		return morton;
 	}
 }
