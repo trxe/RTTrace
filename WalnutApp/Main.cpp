@@ -5,6 +5,10 @@
 #include "Walnut/Random.h"
 #include "Walnut/Timer.h"
 
+#include "../imgui-filebrowser/imfilebrowser.h"
+
+#include "Demo.h"
+#include "FileReader.h"
 #include "InputHandler.h"
 
 #include "Light.cuh"
@@ -21,7 +25,7 @@ class RaytracerLayer : public Layer
 public:
 	virtual void OnUIRender() override
 	{
-		// Controls
+
 		ImGui::Begin("Controls");
 		const glm::vec3 pos = input.get_position();
 		ImGui::Text("Camera world pos: %.2f %.2f %.2f", pos.x, pos.y, pos.z);
@@ -29,6 +33,18 @@ public:
 		ImGui::Text("Foward world pos: %.2f %.2f %.2f", fwd.x, fwd.y, fwd.z);
 		const glm::vec3 up = input.get_up_dir();
 		ImGui::Text("Up world pos: %.2f %.2f %.2f", up.x, up.y, up.z);
+
+		if (ImGui::Button("Select file to load into scene")) {
+			file_dialog.SetTypeFilters({ ".fbx" });
+			file_dialog_active = true;
+			file_dialog.Open();
+		}
+		if (selected_file.length() > 0) {
+			ImGui::TextWrapped("Selected file: %s", selected_file.c_str());
+			if (ImGui::Button("Load file")) {
+				LoadFile();
+			}
+		}
 
 		ImGui::InputScalar("Recursion Depth", ImGuiDataType_U32, &recursion_levels, NULL, NULL, "%d");
 
@@ -57,6 +73,19 @@ public:
 
 		ImGui::End();
 
+		/*
+		*/
+		if(file_dialog_active) {
+			file_dialog.Display();
+			
+			if(file_dialog.HasSelected()) {
+				selected_file = file_dialog.GetSelected().string();
+
+				std::cout << "Selected filename" << selected_file << std::endl;
+				file_dialog.ClearSelected();
+			}
+        }
+
 	}
 
 	virtual void OnUpdate(float ts) override {
@@ -66,6 +95,9 @@ public:
 	}
 
 private:
+	ImGui::FileBrowser file_dialog;
+	bool file_dialog_active = false;
+	std::string selected_file = "";
 	InputHandler input;
 	std::shared_ptr<Image> m_Image;
 	float viewport_width{};
@@ -73,75 +105,40 @@ private:
 
 	float last_render_time = -1;
 	abgr_t* data = nullptr;
-	SurfaceInfo* surface_infos = nullptr;
-	LightInfo* light_infos = nullptr;
+	AABB global_bound;
 	int surface_count;
 	int light_count;
 	int recursion_levels = 2;
 	BasicRaytracer tracer;
 
-	void Render()
-	{
+	void LoadFile() {
+		FBXReader reader;
+		std::vector<SurfaceInfo> surface_infos;
+		std::vector<LightInfo> light_infos;
+		reader.parse(selected_file.c_str(), surface_infos, global_bound);
+		tracer.set_world(surface_infos.data(), surface_infos.size());
+		light_infos.clear();
+		light_infos.resize(1);
+		LightInfo& l0 = light_infos[0];
+		l0.type = LightInfo::POINT;
+		l0.origin = global_bound.maxw + Vec3(1.0, 1.0, 1.0);
+		l0.color = Vec3(1.0, 1.0, 1.0);
+		l0.intensity = 1.0f;
+		light_count = 1;
+		tracer.set_lights(light_infos.data(), light_infos.size());
+		Render();
+	}
+
+	void Render() {
 		m_Image = std::make_shared<Image>(viewport_width, viewport_height, ImageFormat::RGBA);
 		size_t pixel_count = static_cast<size_t>(viewport_width * viewport_height);
 
-		if (surface_infos == nullptr) {
-			surface_infos = new SurfaceInfo[3];
-			SurfaceInfo& s0 = surface_infos[0];
-			s0.type = SurfaceInfo::SPHERE;
-			s0.origin = Vec3(1.0, 1.0, -1.0);
-			s0.scale = 1.4;
-			s0.mat.ka = Vec3(0.2, 0.0, 0.0);
-			s0.mat.kd = Vec3(1.0, 0.7, 0.0);
-			s0.mat.ks = Vec3(1.0, 1.0, 1.0);
-			s0.mat.krg = Vec3(0.3, 0.3, 0.3);
-			s0.mat.n = 128;
-			surface_count = 1;
-			/*
-			SurfaceInfo& s1 = surface_infos[1];
-			s1.type = SurfaceInfo::SPHERE;
-			s1.origin = Vec3(1.0, 1.0, 2.0);
-			s1.scale = 0.4;
-			s1.mat.ka = Vec3(0.0, 0.3, 0.0);
-			s1.mat.kd = Vec3(0.0, 1.0, 0.4);
-			s1.mat.ks = Vec3(1.0, 1.0, 1.0);
-			s1.mat.n = 64;
-			*/
-			SurfaceInfo& s2 = surface_infos[2];
-			s2.type = SurfaceInfo::PLANE;
-			s2.origin = Vec3(0.0, -2.0, -2.0);
-			s2.normal = Vec3(0.0, 2.0, 0.0);
-			s2.mat.ka = Vec3(0.0, 0.0, 0.1);
-			s2.mat.kd = Vec3(0.0, 0.2, 0.5);
-			s2.mat.ks = Vec3(1.0, 1.0, 1.0);
-			s2.mat.krg = Vec3(0.8, 0.8, 0.8);
-			s2.mat.n = 64;
-			SurfaceInfo& s3 = surface_infos[1];
-			s3.type = SurfaceInfo::TRIANGLE;
-			s3.points[0] = Vec3(0.0, -0.1, 1.3);
-			s3.points[1] = Vec3(0.0, 0.1, 0.0);
-			s3.points[2] = Vec3(1.3, 0.1, 0.0);
-			s3.normal = Vec3(0.0, 1.0, 0.0);
-			s3.mat.ka = Vec3(0.1, 0.0, 0.0);
-			s3.mat.kd = Vec3(0.7, 0.0, 0.4);
-			s3.mat.ks = Vec3(1.0, 1.0, 1.0);
-			s3.mat.krg = Vec3(0.8, 0.8, 0.8);
-			s3.mat.n = 64;
-			surface_count = 3;
-			/*
-			*/
-			tracer.set_world(surface_infos, surface_count);
-		}
-
-		if (light_infos == nullptr) {
-			light_infos = new LightInfo[1];
-			LightInfo& l0 = light_infos[0];
-			l0.type = LightInfo::POINT;
-			l0.origin = Vec3(1.0, 3.0, 2.0);
-			l0.color = Vec3(1.0, 1.0, 1.0);
-			l0.intensity = 1.0f;
-			light_count = 1;
-			tracer.set_lights(light_infos, light_count);
+		if (last_render_time < 0) {
+			std::vector<SurfaceInfo> surface_infos;
+			std::vector<LightInfo> light_infos;
+			load_demo_scene(surface_infos, light_infos, global_bound);
+			tracer.set_world(surface_infos.data(), surface_infos.size());
+			tracer.set_lights(light_infos.data(), light_infos.size());
 		}
 
 		Timer timer;

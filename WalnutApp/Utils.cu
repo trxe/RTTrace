@@ -1,5 +1,7 @@
 #include <iostream>
+#include <vector>
 #include "cuda_runtime.h"
+
 #include "Utils.cuh"
 
 void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line) {
@@ -11,3 +13,4 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
 		exit(99);
 	}
 }
+
