@@ -106,8 +106,6 @@ private:
 	float last_render_time = -1;
 	abgr_t* data = nullptr;
 	AABB global_bound;
-	int surface_count;
-	int light_count;
 	int recursion_levels = 2;
 	BasicRaytracer tracer;
 
@@ -124,7 +122,6 @@ private:
 		l0.origin = global_bound.maxw + Vec3(1.0, 1.0, 1.0);
 		l0.color = Vec3(1.0, 1.0, 1.0);
 		l0.intensity = 1.0f;
-		light_count = 1;
 		tracer.set_lights(light_infos.data(), light_infos.size());
 		Render();
 	}
