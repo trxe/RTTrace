@@ -10,8 +10,9 @@ Features implemented:
 
 ## Features to implement
 
-- [ ] Loading of 3D meshes into scene (FBX binary and OBJ ascii parser)
-- [ ] HLBVH acceleration structure
+- [x] Loading of 3D meshes into scene (FBX binary and OBJ ascii parser)
+	- [ ] [Optimizing](https://developer.nvidia.com/blog/introducing-low-level-gpu-virtual-memory-management/) cudaMalloc on change of scene
+- [ ] [HLBVH](https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/) acceleration structure
 - [ ] Movement of primitives
 - [ ] Environment cubemap
 - [ ] Area lights

@@ -1,6 +1,7 @@
 #ifndef UTILS_H 
 #define UTILS_H 
 #include <stdint.h>
+#include <vector>
 #include "cuda_runtime.h"
 
 using abgr_t = uint32_t;

@@ -107,7 +107,7 @@ namespace RTTrace {
 		}
 		surface_count = count;
 		if (surfaces_d != nullptr) {
-			checkCudaErrors(cudaFree(&surfaces_d));
+			checkCudaErrors(cudaFree(surfaces_d));
 		}
 		checkCudaErrors(cudaMalloc(&surfaces_d, sizeof(SurfaceInfo) * count));
 		checkCudaErrors(cudaMemcpy(surfaces_d, surfaces, sizeof(SurfaceInfo) * count, cudaMemcpyHostToDevice));
@@ -116,7 +116,7 @@ namespace RTTrace {
 	void Renderer::set_lights(LightInfo* lights, int count) {
 		light_count = count;
 		if (lights_d != nullptr) {
-			checkCudaErrors(cudaFree(&lights_d));
+			checkCudaErrors(cudaFree(lights_d));
 		}
 		checkCudaErrors(cudaMalloc(&lights_d, sizeof(LightInfo) * count));
 		checkCudaErrors(cudaMemcpy(lights_d, lights, sizeof(LightInfo) * count, cudaMemcpyHostToDevice));
