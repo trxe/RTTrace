@@ -1,6 +1,7 @@
 #ifndef UTILS_H 
 #define UTILS_H 
 #include <stdint.h>
+#include <vector>
 #include "cuda_runtime.h"
 
 #include "Vec3.cuh"

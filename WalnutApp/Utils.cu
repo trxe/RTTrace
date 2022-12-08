@@ -1,5 +1,6 @@
 #include <iostream>
 #include "cuda_runtime.h"
+
 #include "Utils.cuh"
 #include "Vec3.cuh"
 

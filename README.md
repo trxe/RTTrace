@@ -1,6 +1,24 @@
-# Walnut App Template
+# GPU Accelerated Real Time Raytracer
 
-This is a simple app template for [Walnut](https://github.com/TheCherno/Walnut) - unlike the example within the Walnut repository, this keeps Walnut as an external submodule and is much more sensible for actually building applications. See the [Walnut](https://github.com/TheCherno/Walnut) repository for more details.
+Features implemented:
 
-## Getting Started
-Once you've cloned, you can customize the `premake5.lua` and `WalnutApp/premake5.lua` files to your liking (eg. change the name from "WalnutApp" to something else).  Once you're happy, run `scripts/Setup.bat` to generate Visual Studio 2022 solution/project files. Your app is located in the `WalnutApp/` directory, which some basic example code to get you going in `WalnutApp/src/WalnutApp.cpp`. I recommend modifying that WalnutApp project to create your own application, as everything should be setup and ready to go.
++ Unity-style camera movement
++ Raytracing with control over levels of recursion from GUI
++ Intersections with spheres, planes and triangles as primitives
++ Simple point lighting
++ AABB intersection checks for acceleration
+
+## Features to implement
+
+- [x] Loading of 3D meshes into scene (FBX binary and OBJ ascii parser)
+	- [ ] [Optimizing](https://developer.nvidia.com/blog/introducing-low-level-gpu-virtual-memory-management/) cudaMalloc on change of scene
+- [ ] [HLBVH](https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/) acceleration structure
+- [ ] Movement of primitives
+- [ ] Environment cubemap
+- [ ] Area lights
+- [ ] Distribution raytracing (Depth of field, anti-aliasing)
+
+## Future upgrades
+
+- [ ] Path tracing
+- [ ] Support for BRDFs and BTDFs
