@@ -11,11 +11,13 @@
 #include "FileReader.h"
 #include "InputHandler.h"
 
+#include "BoundingVolume.cuh"
 #include "Light.cuh"
 #include "Mat.cuh"
 #include "Renderer.cuh"
 #include "Surface.cuh"
 #include "Utils.cuh"
+#include "Vec3.cuh"
 
 using namespace Walnut;
 using namespace RTTrace;
@@ -47,6 +49,14 @@ public:
 		}
 
 		ImGui::InputScalar("Recursion Depth", ImGuiDataType_U32, &recursion_levels, NULL, NULL, "%d");
+		float temp_scene_scale = scene_scale;
+
+		ImGui::SliderFloat("Input scale", &temp_scene_scale, 0.1, 3, "%.4f", 1.0f);
+		if (scene_scale != temp_scene_scale) {
+			scene_scale = temp_scene_scale;
+			TransformWorld();
+			Render();
+		}
 
 		if (ImGui::Button("Render")) {
 			Render();
@@ -107,14 +117,16 @@ private:
 	abgr_t* data = nullptr;
 	AABB global_bound;
 	int recursion_levels = 2;
+	float scene_scale = 1.0f;
 	BasicRaytracer tracer;
+
+	std::vector<SurfaceInfo> surface_infos;
+	std::vector<LightInfo> light_infos;
 
 	void LoadFile() {
 		FBXReader reader;
-		std::vector<SurfaceInfo> surface_infos;
-		std::vector<LightInfo> light_infos;
 		reader.parse(selected_file.c_str(), surface_infos, global_bound);
-		tracer.set_world(surface_infos.data(), surface_infos.size());
+		tracer.set_world(surface_infos.data(), surface_infos.size(), global_bound);
 		light_infos.clear();
 		light_infos.resize(1);
 		LightInfo& l0 = light_infos[0];
@@ -123,7 +135,15 @@ private:
 		l0.color = Vec3(1.0, 1.0, 1.0);
 		l0.intensity = 1.0f;
 		tracer.set_lights(light_infos.data(), light_infos.size());
+		if (scene_scale != 1.0) TransformWorld();
 		Render();
+	}
+
+	void TransformWorld() {
+		for (auto& s : surface_infos) {
+			s.scale = scene_scale;
+		}
+		tracer.set_world(surface_infos.data(), surface_infos.size(), global_bound);
 	}
 
 	void Render() {
@@ -131,10 +151,8 @@ private:
 		size_t pixel_count = static_cast<size_t>(viewport_width * viewport_height);
 
 		if (last_render_time < 0) {
-			std::vector<SurfaceInfo> surface_infos;
-			std::vector<LightInfo> light_infos;
 			load_demo_scene(surface_infos, light_infos, global_bound);
-			tracer.set_world(surface_infos.data(), surface_infos.size());
+			tracer.set_world(surface_infos.data(), surface_infos.size(), global_bound);
 			tracer.set_lights(light_infos.data(), light_infos.size());
 		}
 

@@ -3,6 +3,7 @@
 #include <fbxsdk.h>
 
 #include "FileReader.h"
+#include "BoundingVolume.cuh"
 
 using namespace fbxsdk;
 

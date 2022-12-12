@@ -22,5 +22,16 @@ namespace RTTrace {
 	};
 
 	__host__ __device__ uint32_t left_shift_3(uint32_t x);
+
+	template <class K, class V>
+	__device__ void swap(K* keys, V* vals, size_t first, size_t second) {
+		K temp = keys[first]; 
+		keys[first] = keys[second];
+		keys[second] = temp;
+		V ttemp = vals[first];
+		vals[first] = vals[second];
+		vals[second] = ttemp;
+
+	}
 }
 #endif

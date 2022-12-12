@@ -5,6 +5,7 @@
 
 #include <fstream>
 #include <vector>
+#include "BoundingVolume.cuh"
 #include "Surface.cuh"
 
 #if _DEBUG 

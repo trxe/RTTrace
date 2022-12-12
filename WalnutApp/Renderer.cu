@@ -1,7 +1,9 @@
+#include <bitset>
 #include <iostream>
 
 #include "cuda_runtime.h"
 
+#include "BoundingVolume.cuh"
 #include "Camera.cuh"
 #include "Ray.cuh"
 #include "Renderer.cuh"
@@ -10,7 +12,7 @@
 #include "Vec3.cuh"
 
 #define BLOCK_LENGTH 16
-#define ACC_BLOCK_SIZE 512
+#define ACC_BLOCK_SIZE 128
 
 namespace RTTrace {
 
@@ -27,7 +29,7 @@ namespace RTTrace {
 			for (int s = 0; s < surface_count && !shadow_hit.is_hit; s++) {
 				// ignore this surface.
 				if (s == hit.surface_index) continue;
-				if (!hit_bound(shadow_ray, surfaces[i])) continue;
+				if (!hit_bound(shadow_ray, surfaces[i].minw, surfaces[i].maxw)) continue;
 
 				switch (surfaces[s].type) {
 				case SurfaceInfo::PLANE:
@@ -73,7 +75,8 @@ namespace RTTrace {
 		for (int r = 0; r <= recursion_levels; r++) {
 			HitInfo hit_global;
 			for (int i = 0; i < surface_count; i++) {
-				if (!hit_bound(ray, surfaces[i])) continue;
+				if (x == 0 && y == 0 && i == 0) printf("%f %f %f\n", surfaces[i].origin[0], surfaces[i].origin[1], surfaces[i].origin[2]);
+				if (!hit_bound(ray, surfaces[i].minw, surfaces[i].maxw)) continue;
 				HitInfo hit;
 				switch (surfaces[i].type) {
 				case SurfaceInfo::PLANE:
@@ -103,33 +106,265 @@ namespace RTTrace {
 		data[pos] = vec3_to_abgr(color);
 	}
 
-	__global__ void create_accel_structure(SurfaceInfo* surfaces, int count, const AABB& global_aabb) {
-		int tid = blockIdx.x * blockDim.x + threadIdx.x;
-		if (tid >= count) return;
+	__global__ void gen_morton_kernel(SurfaceInfo* surfaces, AABB* global_aabb, uint32_t* morton_g, uint32_t* idx_g, int count) {
+		int surface_id = blockIdx.x * blockDim.x + threadIdx.x;
+		int tid = threadIdx.x;
 		__shared__ uint32_t morton_codes[ACC_BLOCK_SIZE];
-		SurfaceInfo& surface = surfaces[tid];
+		__shared__ uint32_t sorted_obj_ids[ACC_BLOCK_SIZE];
+		SurfaceInfo& surface = surfaces[surface_id];
 		// set centroids
+		init_bound(surface);
 		switch (surface.type) {
 		case SurfaceInfo::TRIANGLE:
 			Vec3 sum = surface.points[0] + surface.points[1] + surface.points[2];
 			surface.origin = sum / 3.0;
 			break;
 		}
-		morton_codes[tid] = generate_morton_code(surface.origin, global_aabb.minw, global_aabb.maxw);
+
+		morton_codes[tid] = surface_id < count && surface.type != SurfaceInfo::PLANE ? 
+			generate_morton_code(surface.origin, global_aabb->minw, global_aabb->maxw) : 0xFFFFFFFF;
+		sorted_obj_ids[tid] = surface_id < count ? surface_id : 0xFFFFFFFF;
 		__syncthreads();
-		// Fast HLBVH construction on GPUs
+		// SORT odd even mergesort
+		for (int p = 1; p <= blockDim.x; p <<= 1) {
+			int twop = p << 1;
+			for (int k = p; k > 0; k >>= 1) {
+				size_t next = tid + k;
+				if (next < blockDim.x && next / twop == tid / twop && morton_codes[tid] > morton_codes[next]) {
+					swap<uint32_t, uint32_t>(morton_codes, sorted_obj_ids, tid, next);
+				}
+				__syncthreads();
+			}
+		}
+		if (surface_id < count) {
+			morton_g[surface_id] = morton_codes[tid];
+			idx_g[surface_id] = sorted_obj_ids[tid];
+		}
 	}
 
-	void Renderer::set_world(SurfaceInfo* surfaces, int count) {
-		for (int i = 0; i < count; i++) {
-			init_bound(surfaces[i]);
+	__global__ void sort_morton_kernel(uint32_t* morton_g, uint32_t* idx_g, int stride, int p) {
+		int gid = blockIdx.x * blockDim.x + threadIdx.x;
+		int pos = (gid << 1) - (gid & (stride - 1));
+		int halfp = p >> 1;
+		if (stride >= halfp) return;
+		int offset = gid & (halfp - 1);
+		int smaller = (offset >= stride) ? pos - stride : pos;
+		int bigger = (offset >= stride) ? pos : pos + stride;
+		if (morton_g[smaller] > morton_g[bigger]) {
+			swap<uint32_t, uint32_t>(morton_g, idx_g, smaller, bigger);
 		}
+	}
+
+	void generate_sorted_mortons(SurfaceInfo* surfaces, const AABB& global_aabb, uint32_t* morton_d,
+		uint32_t* idx_d, int size, int surface_count) {
+#if _DEBUG
+		cudaEvent_t start, stop;
+		checkCudaErrors(cudaEventCreate(&start));
+		checkCudaErrors(cudaEventCreate(&stop));
+		checkCudaErrors(cudaEventRecord(start));
+#endif
+		dim3 grid = std::ceil((float)size / ACC_BLOCK_SIZE);
+		dim3 block = ACC_BLOCK_SIZE;
+		AABB* aabb_d;
+		checkCudaErrors(cudaMalloc(&aabb_d, sizeof(AABB)));
+		checkCudaErrors(cudaMemcpy(aabb_d, &global_aabb, sizeof(AABB), cudaMemcpyHostToDevice));
+		gen_morton_kernel<<<grid,block>>>(surfaces, aabb_d, morton_d, idx_d, surface_count);
+		checkCudaErrors(cudaDeviceSynchronize());
+		SurfaceInfo* sh = new SurfaceInfo[surface_count];
+		grid = std::ceil(size / (ACC_BLOCK_SIZE << 1));
+		for (int p = (ACC_BLOCK_SIZE << 1); p <= size; p <<= 1) {
+			for (int stride = p; stride > 0; stride >>= 1) {
+				sort_morton_kernel<<<grid, block>>>(morton_d, idx_d, stride, p);
+			}
+		}
+		checkCudaErrors(cudaFree(aabb_d));
+#if _DEBUG
+		checkCudaErrors(cudaEventRecord(stop));
+		checkCudaErrors(cudaEventSynchronize(stop));
+		float ms = -1;
+		checkCudaErrors(cudaEventElapsedTime(&ms, start, stop));
+		std::cout << "Blocks: " << std::ceil(size / ACC_BLOCK_SIZE) << "; Threads per block: " << ACC_BLOCK_SIZE << std::endl;
+		std::cout << ms << " milliseconds" << std::endl;
+#endif
+#if DEBUG
+		uint32_t* morton_h = new uint32_t[surface_count];
+		uint32_t* idx_h = new uint32_t[surface_count];
+		checkCudaErrors(cudaMemcpy(sh, surfaces, sizeof(SurfaceInfo) * surface_count, cudaMemcpyDeviceToHost));
+		checkCudaErrors(cudaMemcpy(morton_h, morton_d, sizeof(uint32_t) * surface_count, cudaMemcpyDeviceToHost));
+		checkCudaErrors(cudaMemcpy(idx_h, idx_d, sizeof(uint32_t) * surface_count, cudaMemcpyDeviceToHost));
+		for (int i = 0; i < surface_count; i++) {
+			std::cout << idx_h[i] << "\t" << std::bitset<32>(morton_h[i]) << " " << sh[i].origin << std::endl;
+		}
+		delete[] morton_h;
+		delete[] idx_h;
+		delete[] sh;
+#endif
+	}
+	
+	__device__ int get_split(uint32_t* sorted_mortons, int s, int e) {
+		if (e == s) return s;
+		uint32_t starting_diff = sorted_mortons[s] ^ sorted_mortons[e];
+		int common_leading_bits = __clz(starting_diff);
+		int split = s;
+		int stride = e - s;
+		do {
+			//  halving the stride
+			stride = (stride + 1) >> 1;
+			int new_split = split + stride;
+			if (new_split < e) {
+				uint32_t split_common_lbits = __clz(sorted_mortons[s] ^ sorted_mortons[new_split]);
+				if (split_common_lbits > common_leading_bits) {
+					split = new_split;
+					common_leading_bits = split_common_lbits;
+				}
+			}
+		} while (stride > 1);
+		return split;
+	}
+
+	/**
+	 * Kernel for generating BVH.
+	 * 
+	 * \param surfaces List of all surfaces (excluding bounds).
+	 * \param bvh List of all bounds and surfaces, size = total_nodes.
+	 * \param surface_count Count of all surfaces.
+	 * \param morton_g Morton codes of each surface, size = surface_count;
+	 * \param idx_g Index of corresponding surface of morton code, size = surface_count;
+	 * \param range_l Index of left-most surface for this bvh node, size = total_nodes and values are surface ids.
+	 * \param range_r Index of right-most surface for this bvh node, size = total_nodes and values are surface ids.
+	 * \param tree_head Global counter of first unset bvh node.
+	 * \return 
+	 */
+	__global__ void bvh_kernel(SurfaceInfo* surfaces, AABB* bvh, int surface_count, 
+		uint32_t* morton_g, uint32_t* idx_g, size_t* range_l, size_t* range_r, size_t* tree_head) {
+		constexpr size_t BOUND_SET = 0xFFFFFFFF;
+		int sorted_id = blockIdx.x * blockDim.x + threadIdx.x;
+		int total_nodes = (surface_count << 1) - 1;
+		if (sorted_id > total_nodes) return;
+		if (sorted_id == 0) { 
+			*tree_head = 0;
+			range_l[0] = 0;
+			range_r[0] = surface_count - 1;
+		}
+		__syncthreads();
+		bool node_set = false;
+		int left_id = -1;
+		int right_id = -1;
+		while (*tree_head < total_nodes) {
+			if (!node_set && sorted_id <= *tree_head) {
+				AABB& bound = bvh[sorted_id];
+				if (range_l[sorted_id] < range_r[sorted_id]) {
+					int start = atomicAdd(tree_head, 2);
+					left_id = start + 1;
+					right_id = start + 2;
+					int split = get_split(morton_g, range_l[sorted_id], range_r[sorted_id]);
+					// used for setting up the bounds later
+					range_l[left_id] = range_l[sorted_id];
+					range_r[left_id] = split;
+					range_l[right_id] = split + 1;
+					range_r[right_id] = range_r[sorted_id];
+					// setting bvh
+					bound.active = true;
+					bound.left_child_bound_idx = left_id;
+					bound.right_child_bound_idx = right_id;
+				} else if (morton_g[sorted_id] == 0xFFFFFFFF) {
+					bound.active = true;
+					size_t surface_id = range_l[sorted_id];
+					SurfaceInfo& s = surfaces[idx_g[surface_id]];
+					bound.minw = s.minw;
+					bound.maxw = s.maxw;
+					bound.surface_device = surfaces+surface_id;
+					bound.left_child_bound_idx = sorted_id;
+					bound.right_child_bound_idx = sorted_id;
+					range_l[sorted_id] = BOUND_SET;
+					range_r[sorted_id] = BOUND_SET;
+				}
+				node_set = true;
+			}
+		}
+
+		if (!node_set && sorted_id < *tree_head) {
+			if (range_l[sorted_id] == range_r[sorted_id]) {
+				AABB& bound = bvh[sorted_id];
+				bound.active = true;
+				size_t surface_id = range_l[sorted_id];
+				SurfaceInfo& s = surfaces[idx_g[surface_id]];
+				bound.minw = s.minw;
+				bound.maxw = s.maxw;
+				bound.surface_device = surfaces+surface_id;
+				bound.left_child_bound_idx = sorted_id;
+				bound.right_child_bound_idx = sorted_id;
+				range_l[sorted_id] = BOUND_SET;
+				range_r[sorted_id] = BOUND_SET;
+				node_set = true;
+			}
+		}
+
+		// now we move onto setting up the minw and maxw for each of the internal nodes.
+		while (range_l[sorted_id] != BOUND_SET) {
+			if (range_l[left_id] == BOUND_SET && range_r[right_id] == BOUND_SET) {
+				// merge_bounds(bvh[sorted_id], bvh[left_id], bvh[right_id]);
+				range_l[sorted_id] = BOUND_SET;
+			}
+			__syncthreads();
+		}
+
+		if (sorted_id != 0) return;
+		for (int i = 0; i < total_nodes; i++) {
+			AABB& b = bvh[i];
+			printf("%d:\t{%f, %f, %f}\t{%f, %f, %f}\n", i, b.minw[0], b.minw[1], b.minw[2], b.maxw[0], b.maxw[1], b.maxw[1]);
+			printf("   \tL [%d] \tR [%d]\n", b.left_child_bound_idx, b.right_child_bound_idx);
+		}
+	}
+
+	void generate_bvh(SurfaceInfo* surfaces, int surface_count, uint32_t* morton_d, uint32_t* idx_d) {
+		AABB* bvh_d;
+		size_t* range_l;
+		size_t* range_r;
+		size_t* tree_head;
+		int total_nodes = (surface_count << 1) - 1;
+		checkCudaErrors(cudaMalloc(&bvh_d, sizeof(AABB) * total_nodes));
+		checkCudaErrors(cudaMalloc(&range_l, sizeof(size_t) * total_nodes));
+		checkCudaErrors(cudaMalloc(&range_r, sizeof(size_t) * total_nodes));
+		checkCudaErrors(cudaMalloc(&tree_head, sizeof(size_t)));
+		dim3 grid = ceil((surface_count << 1) / ACC_BLOCK_SIZE);
+		bvh_kernel<<<grid, ACC_BLOCK_SIZE>>>(surfaces, bvh_d, surface_count, morton_d, idx_d, range_l, range_r, tree_head);
+		// To be passed in from outside later
+		checkCudaErrors(cudaFree(bvh_d));
+		checkCudaErrors(cudaFree(range_l));
+		checkCudaErrors(cudaFree(range_r));
+		checkCudaErrors(cudaFree(tree_head));
+	}
+
+	void Renderer::set_world(SurfaceInfo* surfaces, int count, const AABB& global_bound) {
 		surface_count = count;
 		if (surfaces_d != nullptr) {
 			checkCudaErrors(cudaFree(surfaces_d));
 		}
+		if (bvh_tree != nullptr) {
+			checkCudaErrors(cudaFree(bvh_tree));
+		}
 		checkCudaErrors(cudaMalloc(&surfaces_d, sizeof(SurfaceInfo) * count));
-		checkCudaErrors(cudaMemcpy(surfaces_d, surfaces, sizeof(SurfaceInfo) * count, cudaMemcpyHostToDevice));
+
+		size_t max_nodes = 1 << static_cast<int>(std::ceil(std::log2(count)));
+
+		checkCudaErrors(cudaMalloc(&bvh_tree, sizeof(SurfaceInfo) * max_nodes));
+
+		checkCudaErrors(cudaMemcpy(surfaces_d, surfaces, sizeof(SurfaceInfo) * surface_count, cudaMemcpyHostToDevice));
+
+		uint32_t* morton_d;
+		checkCudaErrors(cudaMalloc(&morton_d, sizeof(uint32_t) * max_nodes));
+		uint32_t* idx_d;
+		checkCudaErrors(cudaMalloc(&idx_d, sizeof(uint32_t) * max_nodes));
+
+		// 1. Generate and Sort the Morton Codes
+		generate_sorted_mortons(surfaces_d, global_bound, morton_d, idx_d, max_nodes, count);
+		// 2. Generate the bvh in chunks of the block size
+		generate_bvh(surfaces_d, count, morton_d, idx_d);
+
+		checkCudaErrors(cudaDeviceSynchronize());
+		checkCudaErrors(cudaFree(morton_d));
+		checkCudaErrors(cudaFree(idx_d));
 	}
 
 	void Renderer::set_lights(LightInfo* lights, int count) {
@@ -137,8 +372,8 @@ namespace RTTrace {
 		if (lights_d != nullptr) {
 			checkCudaErrors(cudaFree(lights_d));
 		}
-		checkCudaErrors(cudaMalloc(&lights_d, sizeof(LightInfo) * count));
-		checkCudaErrors(cudaMemcpy(lights_d, lights, sizeof(LightInfo) * count, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMalloc(&lights_d, sizeof(LightInfo) * light_count));
+		checkCudaErrors(cudaMemcpy(lights_d, lights, sizeof(LightInfo) * light_count, cudaMemcpyHostToDevice));
 	}
 
 	void BasicRaytracer::render(float viewport_width, float viewport_height, int recursion_levels, const CameraInfo& bound, abgr_t* data) {
@@ -161,6 +396,7 @@ namespace RTTrace {
 
 		checkCudaErrors(cudaDeviceSynchronize());
 		gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, surfaces_d, surface_count, lights_d, light_count, recursion_levels);
+		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaMemcpy(data, data_d, pixel_count * sizeof(abgr_t), cudaMemcpyDeviceToHost));
 	}

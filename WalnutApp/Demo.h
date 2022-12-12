@@ -1,6 +1,7 @@
 #ifndef DEMO_H
 #define DEMO_H
 
+#include "BoundingVolume.cuh"
 #include "Surface.cuh"
 #include "Light.cuh"
 

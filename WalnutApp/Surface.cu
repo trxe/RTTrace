@@ -3,43 +3,49 @@
 #include "Vec3.cuh"
 
 namespace RTTrace {
-	__host__ bool init_bound(SurfaceInfo& surface) {
-		AABB& bound = surface.bound;
+	// __host__ __device__ bool init_bound(SurfaceInfo& surface) {
+	__device__ bool init_bound(SurfaceInfo& surface) {
 		switch (surface.type) {
 		case SurfaceInfo::PLANE:
-			bound.active = false;
+			surface.origin *= surface.scale;
+			surface.scale = 1.0;
 			return false;
 		case SurfaceInfo::SPHERE:
-		{
+			surface.origin *= surface.scale;
 			Vec3 unit = Vec3(surface.scale, surface.scale, surface.scale);
-			bound.minw = surface.origin - unit;
-			bound.maxw = surface.origin + unit;
-			bound.active = true;
-		}
+			surface.minw = surface.origin - unit;
+			surface.maxw = surface.origin + unit;
 			return true;
 		case SurfaceInfo::TRIANGLE:
-			bound.minw = surface.points[0];
-			bound.maxw = surface.points[0];
+			for (int p = 0; p < 3; p++) {
+				surface.points[p] *= surface.scale;
+			}
+			surface.minw = surface.points[0];
+			surface.maxw = surface.points[0];
+			surface.origin = surface.points[0];
 			for (int p = 1; p < 3; p++) {
 				for (int axis = 0; axis < 3; axis++) {
-					bound.minw[axis] = std::min(surface.points[p][axis], bound.minw[axis]);
-					bound.maxw[axis] = std::max(surface.points[p][axis], bound.maxw[axis]);
+					surface.minw[axis] = fminf(surface.points[p][axis], surface.minw[axis]);
+					surface.maxw[axis] = fmaxf(surface.points[p][axis], surface.maxw[axis]);
 				}
+				surface.origin += surface.points[p];
 			}
-			bound.active = true;
+			surface.origin *= 1.0f / 3.0f;
+			surface.scale = 1.0;
 			return true;
 		}
 	}
 
-	__device__ bool hit_bound(const Ray& r, const SurfaceInfo& surface) {
-		const AABB& bound = surface.bound;
+	__device__ bool hit_bound(const Ray& r, const Vec3& minw, const Vec3& maxw) {
 		const Vec3& ro = r.origin;
 		const Vec3& rd = r.dir;
-		if (!bound.active) return true;
 		float tming = T_EPSILON, tmaxg = T_MAX;
 		for (int axis = 0; axis < 3; axis++) {
-			float tmin = (bound.minw[axis] - ro[axis]) / rd[axis];
-			float tmax = (bound.maxw[axis] - ro[axis]) / rd[axis];
+			if (minw[axis] == -INFINITY || maxw[axis] == INFINITY) { 
+				return true;
+			}
+			float tmin = (minw[axis] - ro[axis]) / rd[axis];
+			float tmax = (maxw[axis] - ro[axis]) / rd[axis];
 			if (tmin > tmax) {
 				float t = tmin;
 				tmin = tmax;

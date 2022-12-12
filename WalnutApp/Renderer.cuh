@@ -11,6 +11,14 @@ namespace RTTrace {
 	 */
 	class Renderer {
 	public:
+
+		~Renderer() {
+			if (surfaces_d != nullptr) checkCudaErrors(cudaFree(surfaces_d));
+			if (lights_d != nullptr) checkCudaErrors(cudaFree(lights_d));
+			if (bvh_tree != nullptr) checkCudaErrors(cudaFree(bvh_tree));
+			if (data_d != nullptr) checkCudaErrors(cudaFree(data_d));
+		}
+
 		/**
 		 * Renders to the display.
 		 * 
@@ -28,7 +36,7 @@ namespace RTTrace {
 		 * \param surfaces Array of surfaces
 		 * \param count Number of surfaces to send
 		 */
-		virtual void set_world(SurfaceInfo* surfaces, int count);
+		virtual void set_world(SurfaceInfo* surfaces, int count, const AABB& global_bound);
 
 		/**
 		 * Blocking call to send all lights to global memory. Only supports point lights currently.
@@ -41,6 +49,7 @@ namespace RTTrace {
 
 	protected:
 		SurfaceInfo* surfaces_d;
+		SurfaceInfo* bvh_tree;
 		int surface_count;
 		LightInfo* lights_d;
 		int light_count;

@@ -35,26 +35,25 @@ namespace RTTrace {
 		float mu = 1; // refractive index
 	};
 
-	struct AABB {
-		bool active = false;
-		Vec3 minw;
-		Vec3 maxw;
-	};
-
+	// Would have made Bounding Volume a SurfaceInfo type as well 
+	// but unfortunately polymorphism is not great on GPU...
 	struct SurfaceInfo {
-		enum Type { SPHERE, PLANE, TRIANGLE, BVH };
-		Type type;
+		enum Type { NONE, SPHERE, PLANE, TRIANGLE };
+		Type type{ NONE };
 		Vec3 origin; // PLANE
-		Vec3 normal; //PLANE
-		float scale; // SPHERE
+		Vec3 normal{ 0.0, 1.0, 0.0 }; //PLANE
+		float scale = 1.0; // SPHERE
 		Vec3 points[3]{ origin, origin, origin }; // TRIANGLE
 		MaterialInfo mat;
-		AABB bound;
+		size_t bound_idx;
+		Vec3 minw{-INFINITY, -INFINITY, -INFINITY};
+		Vec3 maxw{INFINITY, INFINITY, INFINITY};
 	};
 
-	__host__ bool init_bound(SurfaceInfo& surface);
+	// __host__ __device__ bool init_bound(SurfaceInfo& surface);
+	__device__ bool init_bound(SurfaceInfo& surface);
+	__device__ bool hit_bound(const Ray& r, const Vec3& miw, const Vec3& maxw);
 
-	__device__ bool hit_bound(const Ray& r, const SurfaceInfo& surface);
 	__device__ bool hit_sphere(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);
 	__device__ bool hit_plane(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);
 	__device__ bool hit_triangle(const Ray& r, const SurfaceInfo& surface, HitInfo& hit);

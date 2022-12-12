@@ -44,6 +44,22 @@ namespace RTTrace {
 		return uclamp;
 	}
 
+	__host__ __device__ Vec3 vmin(const Vec3& u, const Vec3& v) {
+		Vec3 omin = u;
+		for (int i = 0; i < 3; i++) {
+			omin[i] = fminf(u[i], v[i]);
+		}
+		return omin;
+	}
+
+	__host__ __device__ Vec3 vmax(const Vec3& u, const Vec3& v) {
+		Vec3 omax = u;
+		for (int i = 0; i < 3; i++) {
+			omax[i] = fmaxf(u[i], v[i]);
+		}
+		return omax;
+	}
+
 	/**
 	 * Clamps vector to a color ranging between WHITE and BLACK.
 	 * 
@@ -101,7 +117,7 @@ namespace RTTrace {
 		uint32_t morton = 0x0;
 		Vec3 rel_pos = inverse_lerp(pos, global_min, global_max);
 		for (int i = 0; i < 3; i++) {
-			uint32_t v = fminf(fmaxf(0.0, pos[i] * 1024.0), 1023.0);
+			uint32_t v = fminf(fmaxf(0.0, rel_pos[i] * 1024.0), 1023.0);
 			uint32_t vv = left_shift_3(v);
 			morton += vv << (2 - i);
 		}

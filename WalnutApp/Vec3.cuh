@@ -38,6 +38,11 @@ namespace RTTrace {
 			return *this;
 		}
 
+		__host__ __device__ Vec3& operator*=(float t) {
+			for (int i = 0; i < 3; i++) a[i] *= t;
+			return *this;
+		}
+
 		__host__ __device__ Vec3& operator*=(const Vec3& b) {
 			for (int i = 0; i < 3; i++) a[i] *= b[i];
 			return *this;
@@ -83,6 +88,8 @@ namespace RTTrace {
 	__host__ __device__ Vec3 norm(const Vec3& u);
 	__host__ __device__ float det(const Vec3& c1, const Vec3& c2, const Vec3& c3);
 	__host__ __device__ Vec3 clamp(const Vec3& u, const Vec3& min, const Vec3& max);
+	__host__ __device__ Vec3 vmin(const Vec3& a, const Vec3& v);
+	__host__ __device__ Vec3 vmax(const Vec3& a, const Vec3& v);
 	__host__ std::ostream& operator<<(std::ostream& os, const Vec3& vec);
 
 	__host__ __device__ Vec3 clamp_color(const Vec3& u);
