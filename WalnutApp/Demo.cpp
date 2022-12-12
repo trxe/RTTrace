@@ -28,16 +28,15 @@ namespace RTTrace {
 		s1.mat.ks = Vec3(1.0f, 1.0f, 1.0f);
 		s1.mat.krg = Vec3(0.8f, 0.8f, 0.8f);
 		s1.mat.n = 64;
+		SurfaceInfo& s2 = surfaces[2];
+		s2.type = SurfaceInfo::SPHERE;
+		s2.origin = Vec3(1.0f, 1.0f, 2.0f);
+		s2.scale = 0.4;
+		s2.mat.ka = Vec3(0.0f, 0.3f, 0.0f);
+		s2.mat.kd = Vec3(0.0f, 1.0f, 0.4);
+		s2.mat.ks = Vec3(1.0f, 1.0f, 1.0f);
+		s2.mat.n = 64;
 		/*
-		SurfaceInfo& s1 = surface_infos[1];
-		s1.type = SurfaceInfo::SPHERE;
-		s1.origin = Vec3(1.0f, 1.0f, 2.0f);
-		s1.scale = 0.4;
-		s1.mat.ka = Vec3(0.0f, 0.3f, 0.0f);
-		s1.mat.kd = Vec3(0.0f, 1.0f, 0.4);
-		s1.mat.ks = Vec3(1.0f, 1.0f, 1.0f);
-		s1.mat.n = 64;
-		*/
 		SurfaceInfo& s2 = surfaces[2];
 		s2.type = SurfaceInfo::PLANE;
 		s2.origin = Vec3(0.0f, -2.0f, -2.0f);
@@ -47,6 +46,7 @@ namespace RTTrace {
 		s2.mat.ks = Vec3(1.0f, 1.0f, 1.0f);
 		s2.mat.krg = Vec3(0.8f, 0.8f, 0.8f);
 		s2.mat.n = 64;
+		*/
 
 		lights.clear();
 		lights.resize(1);

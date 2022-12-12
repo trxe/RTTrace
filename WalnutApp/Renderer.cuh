@@ -49,7 +49,7 @@ namespace RTTrace {
 
 	protected:
 		SurfaceInfo* surfaces_d;
-		SurfaceInfo* bvh_tree;
+		AABB* bvh_tree;
 		int surface_count;
 		LightInfo* lights_d;
 		int light_count;

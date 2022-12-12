@@ -75,7 +75,7 @@ namespace RTTrace {
 		for (int r = 0; r <= recursion_levels; r++) {
 			HitInfo hit_global;
 			for (int i = 0; i < surface_count; i++) {
-				if (x == 0 && y == 0 && i == 0) printf("%f %f %f\n", surfaces[i].origin[0], surfaces[i].origin[1], surfaces[i].origin[2]);
+				// if (x == 0 && y == 0 && i == 0) printf("%f %f %f\n", surfaces[i].origin[0], surfaces[i].origin[1], surfaces[i].origin[2]);
 				if (!hit_bound(ray, surfaces[i].minw, surfaces[i].maxw)) continue;
 				HitInfo hit;
 				switch (surfaces[i].type) {
@@ -201,16 +201,16 @@ namespace RTTrace {
 #endif
 	}
 	
-	__device__ int get_split(uint32_t* sorted_mortons, int s, int e) {
+	__device__ size_t get_split(uint32_t* sorted_mortons, size_t s, size_t e) {
 		if (e == s) return s;
 		uint32_t starting_diff = sorted_mortons[s] ^ sorted_mortons[e];
-		int common_leading_bits = __clz(starting_diff);
-		int split = s;
-		int stride = e - s;
+		size_t common_leading_bits = __clz(starting_diff);
+		size_t split = s;
+		size_t stride = e - s;
 		do {
 			//  halving the stride
 			stride = (stride + 1) >> 1;
-			int new_split = split + stride;
+			size_t new_split = split + stride;
 			if (new_split < e) {
 				uint32_t split_common_lbits = __clz(sorted_mortons[s] ^ sorted_mortons[new_split]);
 				if (split_common_lbits > common_leading_bits) {
@@ -220,6 +220,15 @@ namespace RTTrace {
 			}
 		} while (stride > 1);
 		return split;
+	}
+
+	__device__ void merge_bounds(AABB& output, const AABB& left, const AABB& right) {
+		output.minw = vmin(left.minw, right.minw);
+		output.minw = vmin(output.minw, left.maxw);
+		output.minw = vmin(output.minw, right.maxw);
+		output.maxw = vmax(left.maxw, right.maxw);
+		output.maxw = vmax(output.maxw, left.minw);
+		output.maxw = vmax(output.maxw, right.minw);
 	}
 
 	/**
@@ -240,24 +249,26 @@ namespace RTTrace {
 		constexpr size_t BOUND_SET = 0xFFFFFFFF;
 		int sorted_id = blockIdx.x * blockDim.x + threadIdx.x;
 		int total_nodes = (surface_count << 1) - 1;
+		bool node_set = false;
 		if (sorted_id > total_nodes) return;
 		if (sorted_id == 0) { 
-			*tree_head = 0;
-			range_l[0] = 0;
-			range_r[0] = surface_count - 1;
+			*tree_head = 1;
+			range_l[sorted_id] = 0;
+			range_r[sorted_id] = surface_count - 1;
 		}
 		__syncthreads();
-		bool node_set = false;
 		int left_id = -1;
 		int right_id = -1;
 		while (*tree_head < total_nodes) {
-			if (!node_set && sorted_id <= *tree_head) {
+			// if (sorted_id == 0) printf("tree head %d, surface count %d\n", *tree_head, surface_count);
+			if (!node_set && sorted_id < *tree_head) {
+				// printf("%d: L[%d] R[%d] \n", (int)sorted_id, (int)range_l[sorted_id], (int)range_r[sorted_id]);
 				AABB& bound = bvh[sorted_id];
 				if (range_l[sorted_id] < range_r[sorted_id]) {
 					int start = atomicAdd(tree_head, 2);
-					left_id = start + 1;
-					right_id = start + 2;
-					int split = get_split(morton_g, range_l[sorted_id], range_r[sorted_id]);
+					left_id = start;
+					right_id = start + 1;
+					size_t split = get_split(morton_g, range_l[sorted_id], range_r[sorted_id]);
 					// used for setting up the bounds later
 					range_l[left_id] = range_l[sorted_id];
 					range_r[left_id] = split;
@@ -267,8 +278,9 @@ namespace RTTrace {
 					bound.active = true;
 					bound.left_child_bound_idx = left_id;
 					bound.right_child_bound_idx = right_id;
-				} else if (morton_g[sorted_id] == 0xFFFFFFFF) {
-					bound.active = true;
+					// printf("\t-split: %d\n\t-left %d: L[%d] R[%d]\n\t-right %d: L[%d] R[%d]\n", (int)split, (int)left_id, (int)range_l[left_id], (int)range_r[left_id], (int)right_id, (int)range_l[right_id], (int)range_r[right_id]);
+				} else {
+					bound.active = morton_g[sorted_id] != 0xFFFFFFFF;
 					size_t surface_id = range_l[sorted_id];
 					SurfaceInfo& s = surfaces[idx_g[surface_id]];
 					bound.minw = s.minw;
@@ -276,11 +288,10 @@ namespace RTTrace {
 					bound.surface_device = surfaces+surface_id;
 					bound.left_child_bound_idx = sorted_id;
 					bound.right_child_bound_idx = sorted_id;
-					range_l[sorted_id] = BOUND_SET;
-					range_r[sorted_id] = BOUND_SET;
 				}
 				node_set = true;
 			}
+			__syncthreads();
 		}
 
 		if (!node_set && sorted_id < *tree_head) {
@@ -294,31 +305,36 @@ namespace RTTrace {
 				bound.surface_device = surfaces+surface_id;
 				bound.left_child_bound_idx = sorted_id;
 				bound.right_child_bound_idx = sorted_id;
-				range_l[sorted_id] = BOUND_SET;
-				range_r[sorted_id] = BOUND_SET;
 				node_set = true;
+				// printf("%d: L[%d] R[%d]\n", (int)sorted_id, (int)range_l[sorted_id], (int)range_r[sorted_id]);
 			}
 		}
 
 		// now we move onto setting up the minw and maxw for each of the internal nodes.
 		while (range_l[sorted_id] != BOUND_SET) {
-			if (range_l[left_id] == BOUND_SET && range_r[right_id] == BOUND_SET) {
-				// merge_bounds(bvh[sorted_id], bvh[left_id], bvh[right_id]);
+			// printf("CHECK %d\n", sorted_id);
+			if (range_l[sorted_id] == range_r[sorted_id]) {
+				range_l[sorted_id] = range_r[sorted_id] = BOUND_SET;
+			} else if (range_l[left_id] == BOUND_SET && range_r[right_id] == BOUND_SET) {
+				merge_bounds(bvh[sorted_id], bvh[left_id], bvh[right_id]);
 				range_l[sorted_id] = BOUND_SET;
+				range_r[sorted_id] = BOUND_SET;
 			}
 			__syncthreads();
 		}
 
+#if DEBUG
 		if (sorted_id != 0) return;
 		for (int i = 0; i < total_nodes; i++) {
 			AABB& b = bvh[i];
 			printf("%d:\t{%f, %f, %f}\t{%f, %f, %f}\n", i, b.minw[0], b.minw[1], b.minw[2], b.maxw[0], b.maxw[1], b.maxw[1]);
-			printf("   \tL [%d] \tR [%d]\n", b.left_child_bound_idx, b.right_child_bound_idx);
+			// printf("   \trange: L [%d] \tR [%d]\n", (int)range_l[i], (int)range_r[i]);
+			printf("   \tchild: L [%d] \tR [%d]\n", (int)b.left_child_bound_idx, (int)b.right_child_bound_idx);
 		}
+#endif
 	}
 
-	void generate_bvh(SurfaceInfo* surfaces, int surface_count, uint32_t* morton_d, uint32_t* idx_d) {
-		AABB* bvh_d;
+	void generate_bvh(AABB* bvh_d, SurfaceInfo* surfaces, int surface_count, uint32_t* morton_d, uint32_t* idx_d) {
 		size_t* range_l;
 		size_t* range_r;
 		size_t* tree_head;
@@ -327,10 +343,10 @@ namespace RTTrace {
 		checkCudaErrors(cudaMalloc(&range_l, sizeof(size_t) * total_nodes));
 		checkCudaErrors(cudaMalloc(&range_r, sizeof(size_t) * total_nodes));
 		checkCudaErrors(cudaMalloc(&tree_head, sizeof(size_t)));
-		dim3 grid = ceil((surface_count << 1) / ACC_BLOCK_SIZE);
+		dim3 grid = ceil((float)(surface_count << 1) / ACC_BLOCK_SIZE);
 		bvh_kernel<<<grid, ACC_BLOCK_SIZE>>>(surfaces, bvh_d, surface_count, morton_d, idx_d, range_l, range_r, tree_head);
+		checkCudaErrors(cudaDeviceSynchronize());
 		// To be passed in from outside later
-		checkCudaErrors(cudaFree(bvh_d));
 		checkCudaErrors(cudaFree(range_l));
 		checkCudaErrors(cudaFree(range_r));
 		checkCudaErrors(cudaFree(tree_head));
@@ -345,12 +361,11 @@ namespace RTTrace {
 			checkCudaErrors(cudaFree(bvh_tree));
 		}
 		checkCudaErrors(cudaMalloc(&surfaces_d, sizeof(SurfaceInfo) * count));
+		checkCudaErrors(cudaMemcpy(surfaces_d, surfaces, sizeof(SurfaceInfo) * surface_count, cudaMemcpyHostToDevice));
 
 		size_t max_nodes = 1 << static_cast<int>(std::ceil(std::log2(count)));
 
-		checkCudaErrors(cudaMalloc(&bvh_tree, sizeof(SurfaceInfo) * max_nodes));
-
-		checkCudaErrors(cudaMemcpy(surfaces_d, surfaces, sizeof(SurfaceInfo) * surface_count, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMalloc(&bvh_tree, sizeof(AABB) * max_nodes));
 
 		uint32_t* morton_d;
 		checkCudaErrors(cudaMalloc(&morton_d, sizeof(uint32_t) * max_nodes));
@@ -360,9 +375,8 @@ namespace RTTrace {
 		// 1. Generate and Sort the Morton Codes
 		generate_sorted_mortons(surfaces_d, global_bound, morton_d, idx_d, max_nodes, count);
 		// 2. Generate the bvh in chunks of the block size
-		generate_bvh(surfaces_d, count, morton_d, idx_d);
+		generate_bvh(bvh_tree, surfaces_d, count, morton_d, idx_d);
 
-		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaFree(morton_d));
 		checkCudaErrors(cudaFree(idx_d));
 	}
@@ -396,7 +410,6 @@ namespace RTTrace {
 
 		checkCudaErrors(cudaDeviceSynchronize());
 		gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, surfaces_d, surface_count, lights_d, light_count, recursion_levels);
-		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaMemcpy(data, data_d, pixel_count * sizeof(abgr_t), cudaMemcpyDeviceToHost));
 	}

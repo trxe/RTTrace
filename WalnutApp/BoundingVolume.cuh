@@ -17,14 +17,6 @@ namespace RTTrace {
 		// int surface_idx{ -1 };
 	};
 
-	__device__ inline static void merge_bounds(AABB& output, const AABB& left, const AABB& right) {
-		output.minw = vmin(left.minw, right.minw);
-		output.minw = vmin(output.minw, left.maxw);
-		output.minw = vmin(output.minw, right.maxw);
-		output.maxw = vmax(left.maxw, right.maxw);
-		output.maxw = vmax(output.maxw, left.minw);
-		output.maxw = vmax(output.maxw, right.minw);
-	}
 }
 
 #endif // !BOUND_H
