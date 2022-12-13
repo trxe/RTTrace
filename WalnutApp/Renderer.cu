@@ -12,7 +12,7 @@
 #include "Vec3.cuh"
 
 #define BLOCK_LENGTH 16
-#define ACC_BLOCK_SIZE 128
+#define ACC_BLOCK_SIZE 512
 
 namespace RTTrace {
 
@@ -57,6 +57,86 @@ namespace RTTrace {
 		}
 		color += surface.mat.ka;
 		return color;
+	}
+
+	// On a single thread only
+	__device__ int iterative_traversal(int* list, const AABB* bvh, const Ray& ray) {
+		size_t aabb_stack[64];
+		int surface_index = 0;
+		size_t* head = aabb_stack;
+		*head++ = 0; // push [0] onto stack
+		
+		do {
+			// ASSUMES HEAD IS ALWAYS HIT
+			const AABB& aabb = bvh[*(--head)];
+			if (aabb.is_surface()) {
+				list[surface_index] = aabb.surface_idx;
+				surface_index++;
+				continue;
+			}
+			const AABB& left = bvh[aabb.left_child_bound_idx];
+			if (hit_bound(ray, left.minw, left.maxw)) {
+				*(head++) = aabb.left_child_bound_idx;
+			}
+			const AABB& right = bvh[aabb.right_child_bound_idx];
+			if (hit_bound(ray, right.minw, right.maxw)) {
+				*(head++) = aabb.right_child_bound_idx;
+			}
+		} while (head != aabb_stack);
+		return surface_index;
+	}
+
+	__global__ void gpu_acc_render(
+			const CameraInfo* bound, int width, int height, abgr_t* data, 
+			const AABB* bvh, const SurfaceInfo* surfaces, int surface_count, 
+			const LightInfo* lights, int light_count, int recursion_levels) {
+		int x = blockIdx.x * blockDim.x + threadIdx.x;
+		int y = blockIdx.y * blockDim.y + threadIdx.y;
+		// need to invert position
+		int pos = (height - y) * width + (width - x);
+		if (x >= width || y >= height) return;
+		Camera c(*bound, width, height);
+		Ray ray = c.gen_ray(x, y);
+		Vec3 color{};
+		Vec3 att = Vec3(1, 1, 1);
+		int surface_list[ACC_BLOCK_SIZE];
+		for (int r = 0; r <= recursion_levels; r++) {
+			HitInfo hit_global;
+			const AABB& aabb = bvh[0];
+			int aabb_idx = 0;
+			if (!hit_bound(ray, aabb.minw, aabb.maxw)) { 
+				// printf("%f %f %f | %f %f %f \n", aabb.minw[0], aabb.minw[1], aabb.minw[2], aabb.maxw[0], aabb.maxw[1], aabb.maxw[2]);
+				break;
+			}
+			// printf("SUCC %f %f %f | %f %f %f \n", aabb.minw[0], aabb.minw[1], aabb.minw[2], aabb.maxw[0], aabb.maxw[1], aabb.maxw[2]);
+			int surface_count = iterative_traversal(surface_list, bvh, ray);
+			for (int i = 0; i < surface_count; i++) {
+				// if (x == 0 && y == 0 && i == 0) printf("%f %f %f\n", surfaces[i].origin[0], surfaces[i].origin[1], surfaces[i].origin[2]);
+				// if (!hit_bound(ray, surfaces[i].minw, surfaces[i].maxw)) continue;
+				HitInfo hit;
+				switch (surfaces[i].type) {
+				case SurfaceInfo::SPHERE:
+					hit_sphere(ray, surfaces[i], hit);
+					break;
+				case SurfaceInfo::TRIANGLE:
+					hit_triangle(ray, surfaces[i], hit);
+					break;
+				}
+				if (hit.t < hit_global.t) {
+					hit_global = hit;
+					hit_global.surface_index = i;
+				}
+			}
+
+			if (hit_global.is_hit) {
+				color += get_light(hit_global, lights, light_count, surfaces, surface_count) * att;
+				// set up next level of recursion: light and reflection ray
+				att *= surfaces[hit_global.surface_index].mat.krg;
+				ray.origin = hit_global.pos;
+				ray.dir = norm(hit_global.refl_dir);
+			}
+		}
+		data[pos] = vec3_to_abgr(color);
 	}
 
 	__global__ void gpu_render(
@@ -106,6 +186,16 @@ namespace RTTrace {
 		data[pos] = vec3_to_abgr(color);
 	}
 
+	/**
+	 * Kernel for generating and sorting in chunks of BLOCKSIZE.
+	 * 
+	 * \param surfaces
+	 * \param global_aabb
+	 * \param morton_g
+	 * \param idx_g
+	 * \param count
+	 * \return 
+	 */
 	__global__ void gen_morton_kernel(SurfaceInfo* surfaces, AABB* global_aabb, uint32_t* morton_g, uint32_t* idx_g, int count) {
 		int surface_id = blockIdx.x * blockDim.x + threadIdx.x;
 		int tid = threadIdx.x;
@@ -142,6 +232,15 @@ namespace RTTrace {
 		}
 	}
 
+	/**
+	 * Kernel for sorting mortons globally.
+	 * 
+	 * \param morton_g
+	 * \param idx_g
+	 * \param stride
+	 * \param p
+	 * \return 
+	 */
 	__global__ void sort_morton_kernel(uint32_t* morton_g, uint32_t* idx_g, int stride, int p) {
 		int gid = blockIdx.x * blockDim.x + threadIdx.x;
 		int pos = (gid << 1) - (gid & (stride - 1));
@@ -155,6 +254,16 @@ namespace RTTrace {
 		}
 	}
 
+	/**
+	 * Helper function to generate and sort all morton codes.
+	 * 
+	 * \param surfaces Surfaces
+	 * \param global_aabb The largest bounding volume containing all surfaces
+	 * \param morton_d Sorted Morton codes on DEVICE
+	 * \param idx_d Sorted surface indexes on DEVICE
+	 * \param size total size (2^ceil(log(surface_count))
+	 * \param surface_count Number of surfaces
+	 */
 	void generate_sorted_mortons(SurfaceInfo* surfaces, const AABB& global_aabb, uint32_t* morton_d,
 		uint32_t* idx_d, int size, int surface_count) {
 #if _DEBUG
@@ -183,7 +292,7 @@ namespace RTTrace {
 		checkCudaErrors(cudaEventSynchronize(stop));
 		float ms = -1;
 		checkCudaErrors(cudaEventElapsedTime(&ms, start, stop));
-		std::cout << "Blocks: " << std::ceil(size / ACC_BLOCK_SIZE) << "; Threads per block: " << ACC_BLOCK_SIZE << std::endl;
+		std::cout << "Blocks: " << std::ceil((float)size / ACC_BLOCK_SIZE) << "; Threads per block: " << ACC_BLOCK_SIZE << std::endl;
 		std::cout << ms << " milliseconds" << std::endl;
 #endif
 #if DEBUG
@@ -260,7 +369,7 @@ namespace RTTrace {
 		int left_id = -1;
 		int right_id = -1;
 		while (*tree_head < total_nodes) {
-			// if (sorted_id == 0) printf("tree head %d, surface count %d\n", *tree_head, surface_count);
+			// if (sorted_id == 0) printf("tree head %d, max nodes count %d\n", (int)*tree_head, total_nodes);
 			if (!node_set && sorted_id < *tree_head) {
 				// printf("%d: L[%d] R[%d] \n", (int)sorted_id, (int)range_l[sorted_id], (int)range_r[sorted_id]);
 				AABB& bound = bvh[sorted_id];
@@ -278,18 +387,22 @@ namespace RTTrace {
 					bound.active = true;
 					bound.left_child_bound_idx = left_id;
 					bound.right_child_bound_idx = right_id;
-					// printf("\t-split: %d\n\t-left %d: L[%d] R[%d]\n\t-right %d: L[%d] R[%d]\n", (int)split, (int)left_id, (int)range_l[left_id], (int)range_r[left_id], (int)right_id, (int)range_l[right_id], (int)range_r[right_id]);
+					// printf("%d:\n\t-split: %d\n\t-left %d: L[%d] R[%d]\n\t-right %d: L[%d] R[%d]\n", (int)sorted_id, (int)split, (int)left_id, (int)range_l[left_id], (int)range_r[left_id], (int)right_id, (int)range_l[right_id], (int)range_r[right_id]);
+					// printf("%d: L[%d] R[%d]\t\tTH%d/%d\n", (int)sorted_id, (int)range_l[sorted_id], (int)range_r[sorted_id], (int)*tree_head, total_nodes);
 				} else {
 					bound.active = morton_g[sorted_id] != 0xFFFFFFFF;
 					size_t surface_id = range_l[sorted_id];
 					SurfaceInfo& s = surfaces[idx_g[surface_id]];
 					bound.minw = s.minw;
 					bound.maxw = s.maxw;
-					bound.surface_device = surfaces+surface_id;
+					// bound.surface_device = surfaces+surface_id;
+					bound.surface_idx = surface_id;
 					bound.left_child_bound_idx = sorted_id;
 					bound.right_child_bound_idx = sorted_id;
+					// printf("%d: [%d]\t\tTH%d/%d\n", (int)sorted_id, (int)range_l[sorted_id], (int)*tree_head, total_nodes);
 				}
 				node_set = true;
+				printf("%d %d %d %d\n", (int)sorted_id, (int)bound.left_child_bound_idx, (int)bound.right_child_bound_idx, (int)*tree_head);
 			}
 			__syncthreads();
 		}
@@ -302,13 +415,18 @@ namespace RTTrace {
 				SurfaceInfo& s = surfaces[idx_g[surface_id]];
 				bound.minw = s.minw;
 				bound.maxw = s.maxw;
-				bound.surface_device = surfaces+surface_id;
+				// bound.surface_device = surfaces+surface_id;
+				bound.surface_idx = surface_id;
 				bound.left_child_bound_idx = sorted_id;
 				bound.right_child_bound_idx = sorted_id;
 				node_set = true;
-				// printf("%d: L[%d] R[%d]\n", (int)sorted_id, (int)range_l[sorted_id], (int)range_r[sorted_id]);
+				// printf("%d: [%d]\tTH%d/%d\n", (int)sorted_id, (int)range_l[sorted_id], (int)*tree_head, total_nodes);
+				printf("%d %d %d %d\n", (int)sorted_id, (int)bound.left_child_bound_idx, (int)bound.right_child_bound_idx, (int)*tree_head);
 			}
 		}
+
+		// printf("%d: L[%d] R[%d]\n", (int)sorted_id, (int)range_l[sorted_id], (int)range_r[sorted_id]);
+
 
 		// now we move onto setting up the minw and maxw for each of the internal nodes.
 		while (range_l[sorted_id] != BOUND_SET) {
@@ -323,6 +441,8 @@ namespace RTTrace {
 			__syncthreads();
 		}
 
+		__syncthreads();
+
 #if DEBUG
 		if (sorted_id != 0) return;
 		for (int i = 0; i < total_nodes; i++) {
@@ -334,17 +454,24 @@ namespace RTTrace {
 #endif
 	}
 
+	__global__ void help(const AABB* bvh, int count) {
+		for (int i = 0; i < count; i++) {
+			const AABB& aabb = bvh[i];
+			printf("%f %f %f | %f %f %f \n", aabb.minw[0], aabb.minw[1], aabb.minw[2], aabb.maxw[0], aabb.maxw[1], aabb.maxw[2]);
+		}
+	}
+
 	void generate_bvh(AABB* bvh_d, SurfaceInfo* surfaces, int surface_count, uint32_t* morton_d, uint32_t* idx_d) {
 		size_t* range_l;
 		size_t* range_r;
 		size_t* tree_head;
 		int total_nodes = (surface_count << 1) - 1;
-		checkCudaErrors(cudaMalloc(&bvh_d, sizeof(AABB) * total_nodes));
 		checkCudaErrors(cudaMalloc(&range_l, sizeof(size_t) * total_nodes));
 		checkCudaErrors(cudaMalloc(&range_r, sizeof(size_t) * total_nodes));
 		checkCudaErrors(cudaMalloc(&tree_head, sizeof(size_t)));
 		dim3 grid = ceil((float)(surface_count << 1) / ACC_BLOCK_SIZE);
 		bvh_kernel<<<grid, ACC_BLOCK_SIZE>>>(surfaces, bvh_d, surface_count, morton_d, idx_d, range_l, range_r, tree_head);
+		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaDeviceSynchronize());
 		// To be passed in from outside later
 		checkCudaErrors(cudaFree(range_l));
@@ -376,6 +503,8 @@ namespace RTTrace {
 		generate_sorted_mortons(surfaces_d, global_bound, morton_d, idx_d, max_nodes, count);
 		// 2. Generate the bvh in chunks of the block size
 		generate_bvh(bvh_tree, surfaces_d, count, morton_d, idx_d);
+		// int total_nodes = (surface_count << 1) - 1;
+		// help << <1, 1 >> > (bvh_tree, total_nodes);
 
 		checkCudaErrors(cudaFree(morton_d));
 		checkCudaErrors(cudaFree(idx_d));
@@ -409,7 +538,11 @@ namespace RTTrace {
 		checkCudaErrors(cudaMemcpy(info_device, &bound, sizeof(CameraInfo), cudaMemcpyHostToDevice));
 
 		checkCudaErrors(cudaDeviceSynchronize());
-		gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, surfaces_d, surface_count, lights_d, light_count, recursion_levels);
+		// gpu_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, surfaces_d, surface_count, lights_d, light_count, recursion_levels);
+		// checkCudaErrors(cudaDeviceSynchronize());
+
+		// TO REMOVE try rendering just once
+		gpu_acc_render<<<gridDim,blockDim>>>(info_device, static_cast<int>(viewport_width), static_cast<int>(viewport_height), data_d, bvh_tree, surfaces_d, surface_count, lights_d, light_count, recursion_levels);
 		checkCudaErrors(cudaDeviceSynchronize());
 		checkCudaErrors(cudaMemcpy(data, data_d, pixel_count * sizeof(abgr_t), cudaMemcpyDeviceToHost));
 	}

@@ -13,8 +13,9 @@ namespace RTTrace {
 		Vec3 maxw;
 		size_t left_child_bound_idx;
 		size_t right_child_bound_idx;
-		SurfaceInfo* surface_device{ nullptr };
-		// int surface_idx{ -1 };
+		// SurfaceInfo* surface_device{ nullptr };
+		__host__ __device__ bool is_surface() const { return left_child_bound_idx == right_child_bound_idx; }
+		int surface_idx{ -1 };
 	};
 
 }
